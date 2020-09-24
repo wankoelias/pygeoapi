@@ -1369,6 +1369,7 @@ class API:
             response = [job['identifier'] for job in jobs]
             return headers_, 200, json.dumps(response, default=json_serial)
 
+        isFormData = True
         if method == 'POST' and not data and not isFormData:
             # TODO not all processes require input, e.g. time-depenendent or
             # random value generators
