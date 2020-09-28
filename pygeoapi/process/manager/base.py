@@ -193,6 +193,7 @@ class BaseManager(object):
             self.update_job(processid, job_id, job_update_metadata)
 
         except Exception as err:
+            LOGGER.exception("error during execution")
             # TODO assess correct exception type and description to help users
             # NOTE, the /results endpoint should return the error HTTP status
             # for jobs that failed, ths specification says that failing jobs

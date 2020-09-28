@@ -54,8 +54,6 @@ PLUGINS = {
     },
     'process': {
         'HelloWorld': 'pygeoapi.process.hello_world.HelloWorldProcessor',
-        # TODO: this should not be necessary if referencing via config, but i haven't found out how to set the config up to do this
-        'Notebook': 'pygeoapi.process.notebook.PapermillNotebookKubernetesProcessor',
     },
     'process_manager': {
         'TinyDB': 'pygeoapi.process.manager.tinydb_.TinyDBManager',

@@ -57,7 +57,7 @@ LABEL maintainer="Just van den Broecke <justb4@gmail.com>"
 ARG TZ="Etc/UTC"
 ARG LANG="en_US.UTF-8"
 ARG ADD_DEB_PACKAGES=""
-ARG ADD_PIP_PACKAGES=""
+ARG ADD_PIP_PACKAGES="kubernetes"
 
 # ENV settings
 ENV TZ=${TZ} \
@@ -112,3 +112,5 @@ COPY ./docker/entrypoint.sh /entrypoint.sh
 
 WORKDIR /pygeoapi
 ENTRYPOINT ["/entrypoint.sh"]
+
+COPY ./my-process.config.yml /pygeoapi/local.config.yml

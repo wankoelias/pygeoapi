@@ -1,8 +1,8 @@
 # =================================================================
 #
-# Authors: Bernhard Mallinger <bernhard.mallinger@eox.at>
+# Authors: Tom Kralidis <tomkralidis@gmail.com>
 #
-# Copyright (c) 2020 Bernhard Mallinger
+# Copyright (c) 2020 Tom Kralidis
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -31,7 +31,7 @@ server:
     bind:
         host: 0.0.0.0
         port: 80
-    url: /
+    url: /oapi
     mimetype: application/json; charset=UTF-8
     encoding: utf-8
     language: en-US
@@ -42,9 +42,6 @@ server:
         url: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
         attribution: '<a href="https://wikimediafoundation.org/wiki/Maps_Terms_of_Use">Wikimedia maps</a> | Map data &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
     # ogc_schemas_location: /opt/schemas.opengis.net
-    manager: # TODO: k8s
-        name: TinyDB
-        connection: /tmp/pygeoapi-process-manager.d
 
 logging:
     level: DEBUG
@@ -87,6 +84,24 @@ metadata:
 resources:
     notebook:
         type: process
-        processor:
-          name: pygeoapi.process.notebook.PapermillNotebookKubernetesProcessor
+    foo:
+        title: foo
+        type : collection
+        description: foo bar
+        links: []
+        keywords: []
+        extents:
+            spatial:
+                bbox: [-180,-90,180,90]
+                crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
+            temporal:
+                begin: 2000-10-30T18:24:39Z
+                end: 2007-10-30T08:57:29Z
+        providers:
+          - type: coverage
+            name: rasterio
+            data: https://eoxhub-data.s3.eu-central-1.amazonaws.com/bucharest-cloudless-2019/Bucharest_B04.tif
+            format:
+              name: GTiff
+              mimetype: application/x-geotiff
 
