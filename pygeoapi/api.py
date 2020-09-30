@@ -1255,6 +1255,7 @@ class API:
             LOGGER.error(exception)
             return headers_, 400, json.dumps(exception)
 
+        # MANAGER-NOTE: the code for finding the process occurs multiple times, maybe unify?
         processes_config = filter_dict_by_key_value(self.config['resources'],
                                                     'type', 'process')
 
@@ -1360,6 +1361,7 @@ class API:
 
         process = load_plugin('process', processes_config.get(process_id, {}).get('processor'))
 
+        # MANAGER-NOTE: it's a bit confusing that this method returns processes as well as starts new ones.
         if method == 'GET' and process_id:
             jobs = sorted(self.manager.get_jobs(process_id), key=lambda k: k['process_start_datetime'], reverse=True)
             if not format_ or format_ == 'html':
@@ -1369,6 +1371,7 @@ class API:
             response = [job['identifier'] for job in jobs]
             return headers_, 200, json.dumps(response, default=json_serial)
 
+        # MANAGER-NOTE: isFormData wasn't defined before
         isFormData = True
         if method == 'POST' and not data and not isFormData:
             # TODO not all processes require input, e.g. time-depenendent or
