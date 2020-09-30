@@ -60,6 +60,7 @@ class BaseManager(object):
 
         :returns: `bool` status of result
         """
+        # MANAGER-NOTE: this is never called
 
         raise NotImplementedError()
 
@@ -69,6 +70,7 @@ class BaseManager(object):
 
         :returns: `bool` status of result
         """
+        # MANAGER-NOTE: this is never called
 
         raise NotImplementedError()
 
@@ -85,6 +87,7 @@ class BaseManager(object):
 
         raise NotImplementedError()
 
+    # MANAGER-NOTE: mostly "job_id" is used, here it's "jobid", maybe unify?
     def get_job_result(self, processid, jobid):
         """
         Get a single job
@@ -240,6 +243,7 @@ class BaseManager(object):
         return self._execute_handler_async(p, job_id, data_dict)
 
     def get_job_status(self, p, job_id, data_dict):
+        # MANAGER-NOTE: this is not implemented in tinydb and not used?
         """
 
         """

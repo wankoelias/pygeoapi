@@ -1833,6 +1833,7 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
             LOGGER.error(exception)
             return headers_, 400, to_json(exception, self.pretty_print)
 
+        # MANAGER-NOTE: the code for finding the process occurs multiple times, maybe unify?
         processes_config = filter_dict_by_key_value(self.config['resources'],
                                                     'type', 'process')
 
@@ -1963,6 +1964,7 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
 
         process = load_plugin('process', processes_config.get(process_id, {}).get('processor'))
 
+        # MANAGER-NOTE: it's a bit confusing that this method returns processes as well as starts new ones.
         if method == 'GET' and process_id:
             jobs = sorted(self.manager.get_jobs(process_id), key=lambda k: k['process_start_datetime'], reverse=True)
             if not format_ or format_ == 'html':

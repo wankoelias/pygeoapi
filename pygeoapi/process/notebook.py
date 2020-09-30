@@ -27,15 +27,14 @@
 #
 # =================================================================
 
-import enum
 import logging
 from pathlib import Path
 import re
-import time
+from typing import Dict
 
 from kubernetes import client as k8s_client, config as k8s_config
 
-from pygeoapi.process.base import BaseProcessor
+from pygeoapi.process.manager.k8s import KubernetesProcessor
 
 LOGGER = logging.getLogger(__name__)
 
@@ -99,70 +98,14 @@ PROCESS_METADATA = {
 }
 
 
-class JobStatus(enum.Enum):
-    succeeded = "succeeded"
-    failed = "failed"
-    pending = "pending"
-    running = "running"
-
-    @classmethod
-    def from_k8s_library(cls, status: k8s_client.V1JobStatus):
-        # we assume only 1 run without retries
-
-        # these "integers" are None if they are 0, lol
-        if status.succeeded is not None and status.succeeded > 0:
-            return cls.succeeded
-        elif status.failed is not None and status.failed > 0:
-            return cls.failed
-        elif status.active is not None and status.active > 0:
-            return cls.running
-        else:
-            return cls.pending
-
-
-# TODO: job management in k8s, not in tinydb
-
-
-class PapermillNotebookKubernetesProcessor(BaseProcessor):
+class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
 
-    def execute(self, data):
-        value = "papermill {}!".format("yeah")
-        outputs = [{"id": "link_to_result_notebook", "value": value}]
-        LOGGER.critical("got data %s", data)
-
-        job = create_notebook_job(
+    def create_job(self, data: Dict) -> k8s_client.V1Job:
+        return create_notebook_job(
             notebook_path=data["notebook"], parameters=data["parameters"]
         )
-
-        namespace = current_namespace()
-
-        # TODO: only load once
-        k8s_config.load_incluster_config()
-
-        batch_v1 = k8s_client.BatchV1Api()
-        batch_v1.create_namespaced_job(body=job, namespace=namespace)
-
-        LOGGER.info("Add job %s in ns %s", job.metadata.name, namespace)
-
-        while True:
-            # TODO: investigate if list_namespaced_job(watch=True) can be used here
-            time.sleep(2)
-            job_status = JobStatus.from_k8s_library(
-                batch_v1.read_namespaced_job_status(
-                    name=job.metadata.name, namespace=namespace
-                ).status
-            )
-
-            LOGGER.debug("waiting for job %s", job_status)
-
-            if job_status not in (JobStatus.running, JobStatus.pending):
-                break
-
-        LOGGER.info("job finished: %s", job_status)
-
-        return outputs
 
     def __repr__(self):
         return "<PapermillNotebookKubernetesProcessor> {}".format(self.name)
@@ -188,6 +131,7 @@ def create_notebook_job(
     cpu_limit = "2"
     memory_limit = "4G"
 
+    # TODO: include date(time)
     output_notebook = re.sub(".ipynb$", "", notebook_path) + "_result.ipynb"
 
     container = k8s_client.V1Container(
@@ -242,9 +186,3 @@ def create_notebook_job(
             ttl_seconds_after_finished=60 * 60 * 24 * 7,
         ),
     )
-
-
-def current_namespace() -> str:
-    # getting the current namespace like this is documented here, so it should be fine:
-    # https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/
-    return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()

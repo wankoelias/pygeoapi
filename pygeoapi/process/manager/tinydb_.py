@@ -77,7 +77,7 @@ class TinyDBManager(BaseManager):
         self.db.purge()
         self.db.close()
         return True
-
+:
     def get_jobs(self, processid=None, status=None):
         """
         Get jobs
@@ -96,6 +96,7 @@ class TinyDBManager(BaseManager):
             query = tinydb.Query()
             return self.db.search(query.processid == processid)
 
+        # MANAGER-NOTE: this code isn't reachable
         self.db.close()
 
     def add_job(self, job_metadata):
@@ -198,6 +199,7 @@ class TinyDBManager(BaseManager):
         with io.open(location, 'r') as filehandler:
             result = json.load(filehandler)
         return job_status, result
+        # MANAGER-NOTE: this returns (status, result). BaseManager._execute_handler returns (result, status). maybe use dataclass for clarity?
 
     def __repr__(self):
         return '<TinyDBManager> {}'.format(self.name)
