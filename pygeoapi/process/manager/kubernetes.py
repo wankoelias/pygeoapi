@@ -46,7 +46,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class KubernetesProcessor(BaseProcessor):
-    def create_job(self, data: Dict) -> k8s_client.V1Job:
+    def create_job_pod_spec(self, data: Dict) -> k8s_client.V1PodSpec:
         raise NotImplementedError()
 
     def execute(self):
@@ -232,7 +232,19 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
-        job = p.create_job(data=data_dict)
+        spec = p.create_job_pod_spec(data=data_dict)
+
+        job = k8s_client.V1Job(
+            api_version="batch/v1",
+            kind="Job",
+            metadata=k8s_client.V1ObjectMeta(name=k8s_job_name(job_id)),
+            spec=k8s_client.V1JobSpec(
+                template=k8s_client.V1PodTemplateSpec(spec=spec),
+                backoff_limit=0,
+                ttl_seconds_after_finished=60 * 60 * 24 * 7,
+            ),
+        )
+
         # TODO: add metadata annotations (make sure status as enum)
         self.batch_v1.create_namespaced_job(body=job, namespace=self.namespace)
 
