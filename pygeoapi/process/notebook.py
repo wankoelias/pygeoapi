@@ -31,6 +31,7 @@ import logging
 from pathlib import Path
 import re
 from typing import Dict, Tuple
+import urllib.parse
 
 from kubernetes import client as k8s_client, config as k8s_config
 
@@ -168,7 +169,17 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ),
             {
                 "result_type": "link",
-                "link": f"https://example.com/{output_notebook}",
+                "link": (
+                    # NOTE: this link currently doesn't work (even those created in
+                    #   the ui with "create sharable link" don't)
+                    #   there is a recently closed issue about it:
+                    # https://github.com/jupyterlab/jupyterlab/issues/8359
+                    #   it doesn't say when it was fixed exactly. there's a possibly
+                    #   related fix from last year:
+                    # https://github.com/jupyterlab/jupyterlab/pull/6773
+                    "https://edc-jupyter.hub.eox.at/hub/user-redirect/lab/tree/"
+                    + urllib.parse.quote(output_notebook),
+                ),
             },
         )
 
