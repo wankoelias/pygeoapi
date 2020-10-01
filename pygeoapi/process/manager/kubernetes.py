@@ -163,14 +163,13 @@ class KubernetesManager(BaseManager):
             return None, None
 
         job_status = JobStatus[result["status"]]
-
-        if job_status != JobStatus.successful:
-            return job_status, None
-        else:
-            return (
-                job_status,
-                {"result_link": result["result_link"]},
-            )
+        return (
+            job_status,
+            None
+            if job_status != JobStatus.successful
+            else {"result_link": result["result_link"]},
+            # NOTE: this assumes links are the only result type
+        )
 
     def delete_job(self, processid, job_id):
         """
@@ -321,10 +320,10 @@ def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
         for orig_key, v in annotations.items()
         if (parsed_key := parse_annotation_key(orig_key))
     }
+
     status = job_status_from_k8s(job.status)
     completion_time = job.status.completion_time
-    return {
-        **metadata_from_annotation,
+    computed_metadata = {
         # NOTE: this is passed as string as compatibility with base manager
         "status": status.value,
         "message": "",
@@ -336,4 +335,9 @@ def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
         "process_end_datetime": (
             completion_time.strftime(DATETIME_FORMAT) if completion_time else None
         ),
+    }
+
+    return {
+        **metadata_from_annotation,
+        **computed_metadata,
     }
