@@ -88,7 +88,7 @@ PROCESS_METADATA = {
     ],
     "outputs": [
         {
-            "id": "link_to_result_notebook",
+            "id": "result_link",
             "title": "Link to result notebook",
             "description": "Link to result notebook",
             "output": {"formats": [{"mimeType": "text/plain"}]},
