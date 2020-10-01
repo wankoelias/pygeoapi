@@ -90,6 +90,7 @@ class TinyDBManager(BaseManager):
         """
 
         self.connect()
+        # MANAGER-NOTE: status filter is not used here
         if processid is None:
             return [doc.doc_id for doc in self.db.all()]
         else:

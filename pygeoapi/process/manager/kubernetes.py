@@ -27,6 +27,7 @@
 #
 # =================================================================
 
+from datetime import datetime
 from functools import cached_property
 from http import HTTPStatus
 import logging
@@ -39,7 +40,7 @@ import kubernetes.client.rest
 
 from pygeoapi.util import JobStatus
 from pygeoapi.process.base import BaseProcessor
-from pygeoapi.process.manager.base import BaseManager
+from pygeoapi.process.manager.base import BaseManager, DATETIME_FORMAT
 
 
 LOGGER = logging.getLogger(__name__)
@@ -83,8 +84,16 @@ class KubernetesManager(BaseManager):
         :returns: list of jobs (identifier, status, process identifier)
         """
 
-        # TODO
-        raise NotImplementedError()
+        k8s_jobs: k8s_client.V1JobList = self.batch_v1.list_namespaced_job(
+            namespace=self.namespace,
+        )
+        # TODO: implement status filter
+
+        return [
+            job_from_k8s(k8s_job)
+            for k8s_job in k8s_jobs.items
+            if is_k8s_job_name(k8s_job.metadata.name)
+        ]
 
     def get_job_result(self, processid, jobid) -> Optional[Dict]:
         """
@@ -95,28 +104,18 @@ class KubernetesManager(BaseManager):
 
         :returns: `dict`  # `pygeoapi.process.manager.Job`
         """
-
         try:
-            job: k8s_client.V1Job = self.batch_v1.read_namespaced_job(
-                name=k8s_job_name(jobid),
-                namespace=self.namespace,
+            return job_from_k8s(
+                self.batch_v1.read_namespaced_job(
+                    name=k8s_job_name(jobid),
+                    namespace=self.namespace,
+                )
             )
         except kubernetes.client.rest.ApiException as e:
             if e.status == HTTPStatus.NOT_FOUND:
                 return None
             else:
                 raise
-        else:
-            metadata_from_annotation = {
-                parsed_key: v
-                for orig_key, v in job.metadata.annotations.items()
-                if (parsed_key := parse_annotation_key(orig_key))
-            }
-            return {
-                **metadata_from_annotation,
-                # NOTE: this is passed as string as compatibility with base manager
-                "status": job_status_from_k8s(job.status).value,
-            }
 
     def add_job(self, job_metadata):
         """
@@ -170,9 +169,7 @@ class KubernetesManager(BaseManager):
         else:
             return (
                 job_status,
-                {
-                    "result_link": result['result_link']
-                },
+                {"result_link": result["result_link"]},
             )
 
     def delete_job(self, processid, job_id):
@@ -237,9 +234,12 @@ class KubernetesManager(BaseManager):
         """
         spec, result = p.create_job_pod_spec(data=data_dict)
 
-        annotations = {}
-        if result['result_type'] == 'link':
-            annotations[format_annotation_key("result_link")] = result['link']
+        annotations = {
+            "identifier": job_id,
+            "process_start_datetime": datetime.utcnow().strftime(DATETIME_FORMAT),
+        }
+        if result["result_type"] == "link":
+            annotations["result_link"] = result["link"]
         else:
             raise Exception("invalid result type %s", result)
 
@@ -247,8 +247,11 @@ class KubernetesManager(BaseManager):
             api_version="batch/v1",
             kind="Job",
             metadata=k8s_client.V1ObjectMeta(
+                # TODO: job name should include user id
                 name=k8s_job_name(job_id),
-                annotations=annotations,
+                annotations={
+                    format_annotation_key(k): v for k, v in annotations.items()
+                },
             ),
             spec=k8s_client.V1JobSpec(
                 template=k8s_client.V1PodTemplateSpec(spec=spec),
@@ -283,9 +286,17 @@ def format_annotation_key(key: str) -> str:
     return _ANNOTATIONS_PREFIX + key
 
 
+_JOB_NAME_PREFIX = "pygeoapi-job-"
+
+
 def k8s_job_name(job_id: str) -> str:
     # TODO: include process id?
-    return f"pygeoapi-job-{job_id}"
+    # TODO: include user id
+    return f"{_JOB_NAME_PREFIX}{job_id}"
+
+
+def is_k8s_job_name(job_name: str) -> bool:
+    return job_name.startswith(_JOB_NAME_PREFIX)
 
 
 def job_status_from_k8s(status: k8s_client.V1JobStatus) -> JobStatus:
@@ -300,3 +311,29 @@ def job_status_from_k8s(status: k8s_client.V1JobStatus) -> JobStatus:
         return JobStatus.running
     else:
         return JobStatus.accepted
+
+
+def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
+    # annotations is broken in the k8s library, it's None when it is empty
+    annotations = job.metadata.annotations or {}
+    metadata_from_annotation = {
+        parsed_key: v
+        for orig_key, v in annotations.items()
+        if (parsed_key := parse_annotation_key(orig_key))
+    }
+    status = job_status_from_k8s(job.status)
+    completion_time = job.status.completion_time
+    return {
+        **metadata_from_annotation,
+        # NOTE: this is passed as string as compatibility with base manager
+        "status": status.value,
+        "message": "",
+        "progress": {
+            # we've no idea about the actual progress
+            JobStatus.accepted: "5",
+            JobStatus.running: "50",
+        }.get(status, "100"),
+        "process_end_datetime": (
+            completion_time.strftime(DATETIME_FORMAT) if completion_time else None
+        ),
+    }
