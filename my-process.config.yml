@@ -43,8 +43,8 @@ server:
         attribution: '<a href="https://wikimediafoundation.org/wiki/Maps_Terms_of_Use">Wikimedia maps</a> | Map data &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
     # ogc_schemas_location: /opt/schemas.opengis.net
     manager: # TODO: k8s
-        name: TinyDB
-        connection: /tmp/pygeoapi-process-manager.d
+        name: pygeoapi.process.manager.kubernetes.KubernetesManager
+
 
 logging:
     level: DEBUG
