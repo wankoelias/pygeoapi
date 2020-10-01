@@ -46,7 +46,13 @@ LOGGER = logging.getLogger(__name__)
 
 
 class KubernetesProcessor(BaseProcessor):
-    def create_job_pod_spec(self, data: Dict) -> k8s_client.V1PodSpec:
+    def create_job_pod_spec(self, data: Dict) -> Tuple[k8s_client.V1PodSpec, Dict]:
+        """
+        Returns a definition of a job as well as result handling.
+        Currently the only supported way for handling result is for the processor
+        to provide a fixed link where the results will be available (the job itself
+        has to ensure that the resulting data ends up at the link)
+        """
         raise NotImplementedError()
 
     def execute(self):
@@ -165,10 +171,7 @@ class KubernetesManager(BaseManager):
             return (
                 job_status,
                 {
-                    # TODO: this must come from process, write to metadata?
-                    #       -> decide when requirements from other fields (start/end times) are clearer
-                    # TODO: proper link
-                    "notebook_link": f"https://example.com/f{result['notebook']}"
+                    "result_link": result['result_link']
                 },
             )
 
@@ -232,12 +235,21 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
-        spec = p.create_job_pod_spec(data=data_dict)
+        spec, result = p.create_job_pod_spec(data=data_dict)
+
+        annotations = {}
+        if result['result_type'] == 'link':
+            annotations[format_annotation_key("result_link")] = result['link']
+        else:
+            raise Exception("invalid result type %s", result)
 
         job = k8s_client.V1Job(
             api_version="batch/v1",
             kind="Job",
-            metadata=k8s_client.V1ObjectMeta(name=k8s_job_name(job_id)),
+            metadata=k8s_client.V1ObjectMeta(
+                name=k8s_job_name(job_id),
+                annotations=annotations,
+            ),
             spec=k8s_client.V1JobSpec(
                 template=k8s_client.V1PodTemplateSpec(spec=spec),
                 backoff_limit=0,
@@ -259,7 +271,7 @@ class KubernetesManager(BaseManager):
         return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
 
 
-_ANNOTATIONS_PREFIX = "_pygeoapi_"
+_ANNOTATIONS_PREFIX = "pygeoapi_"
 
 
 def parse_annotation_key(key: str) -> Optional[str]:
