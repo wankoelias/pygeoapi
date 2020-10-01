@@ -103,7 +103,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
 
-    def create_job_pod_spec(self, data: Dict) -> Tuple[k8s_client.V1PodSpec, Dict]:
+    def create_job_pod_spec(
+        self,
+        data: Dict,
+        user_uuid: str,
+    ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         notebook_path = data["notebook"]
         parameters = data["parameters"]
         job_name = "job-notebook"
@@ -114,7 +118,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         home_pvc = "edc-dev-jupyter-user"
 
         # TODO: from env
-        home_subpath = "users/0c0a0ef4-2d8d0d-2d4e70-2db002-2d033c7cbb41fd"
+        home_subpath = f"users/{user_uuid}".replace("-", "-2d")
 
         # TODO: fetch these values from profile (will require profile selection in future)
         image = "eurodatacube/jupyter-user:0.20.1"

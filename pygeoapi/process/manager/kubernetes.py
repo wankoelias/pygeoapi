@@ -47,7 +47,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 class KubernetesProcessor(BaseProcessor):
-    def create_job_pod_spec(self, data: Dict) -> Tuple[k8s_client.V1PodSpec, Dict]:
+    def create_job_pod_spec(
+        self,
+        data: Dict,
+        user_uuid: str,
+    ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         """
         Returns a definition of a job as well as result handling.
         Currently the only supported way for handling result is for the processor
@@ -73,6 +77,8 @@ class KubernetesManager(BaseManager):
 
         self.batch_v1 = k8s_client.BatchV1Api()
 
+        self.user_uuid = manager_def["user_uuid"]
+
     def get_jobs(self, processid=None, status=None):
         """
         Get jobs
@@ -92,7 +98,7 @@ class KubernetesManager(BaseManager):
         return [
             job_from_k8s(k8s_job)
             for k8s_job in k8s_jobs.items
-            if is_k8s_job_name(k8s_job.metadata.name)
+            if is_k8s_job_name(user_uuid=self.user_uuid, job_name=k8s_job.metadata.name)
         ]
 
     def get_job_result(self, processid, jobid) -> Optional[Dict]:
@@ -107,7 +113,7 @@ class KubernetesManager(BaseManager):
         try:
             return job_from_k8s(
                 self.batch_v1.read_namespaced_job(
-                    name=k8s_job_name(jobid),
+                    name=k8s_job_name(user_uuid=self.user_uuid, job_id=jobid),
                     namespace=self.namespace,
                 )
             )
@@ -231,7 +237,7 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
-        spec, result = p.create_job_pod_spec(data=data_dict)
+        spec, result = p.create_job_pod_spec(data=data_dict, user_uuid=self.user_uuid)
 
         annotations = {
             "identifier": job_id,
@@ -247,7 +253,7 @@ class KubernetesManager(BaseManager):
             kind="Job",
             metadata=k8s_client.V1ObjectMeta(
                 # TODO: job name should include user id
-                name=k8s_job_name(job_id),
+                name=k8s_job_name(user_uuid=self.user_uuid, job_id=job_id),
                 annotations={
                     format_annotation_key(k): v for k, v in annotations.items()
                 },
@@ -285,17 +291,22 @@ def format_annotation_key(key: str) -> str:
     return _ANNOTATIONS_PREFIX + key
 
 
-_JOB_NAME_PREFIX = "pygeoapi-job-"
+_JOB_NAME_PREFIX = "pygeoapi-"
 
 
-def k8s_job_name(job_id: str) -> str:
+def _job_prefix(user_uuid: str) -> str:
+    # kubernetes has job name length limit
+    short_user_uuid = user_uuid[:12]
+    return f"{_JOB_NAME_PREFIX}{short_user_uuid}"
+
+
+def k8s_job_name(user_uuid: str, job_id: str) -> str:
     # TODO: include process id?
-    # TODO: include user id
-    return f"{_JOB_NAME_PREFIX}{job_id}"
+    return f"{_job_prefix(user_uuid)}-{job_id}"
 
 
-def is_k8s_job_name(job_name: str) -> bool:
-    return job_name.startswith(_JOB_NAME_PREFIX)
+def is_k8s_job_name(user_uuid: str, job_name: str) -> bool:
+    return job_name.startswith(_job_prefix(user_uuid=user_uuid))
 
 
 def job_status_from_k8s(status: k8s_client.V1JobStatus) -> JobStatus:
