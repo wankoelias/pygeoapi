@@ -30,7 +30,7 @@
 import logging
 from pathlib import Path
 import re
-from typing import Dict
+from typing import Dict, Tuple
 
 from kubernetes import client as k8s_client, config as k8s_config
 
@@ -102,7 +102,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
 
-    def create_job_pod_spec(self, data: Dict) -> k8s_client.V1PodSpec:
+    def create_job_pod_spec(self, data: Dict) -> Tuple[k8s_client.V1PodSpec, Dict]:
         notebook_path = data["notebook"]
         parameters = data["parameters"]
         job_name = "job-notebook"
@@ -160,10 +160,16 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ),
         ]
 
-        return k8s_client.V1PodSpec(
-            restart_policy="Never",
-            containers=[container],
-            volumes=volumes,
+        return (
+            k8s_client.V1PodSpec(
+                restart_policy="Never",
+                containers=[container],
+                volumes=volumes,
+            ),
+            {
+                "result_type": "link",
+                "link": f"https://example.com/{output_notebook}",
+            },
         )
 
     def __repr__(self):
