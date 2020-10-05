@@ -166,16 +166,16 @@ class KubernetesManager(BaseManager):
 
         if result is None:
             # no such job
-            return None, None
-
-        job_status = JobStatus[result["status"]]
-        return (
-            job_status,
-            None
-            if job_status != JobStatus.successful
-            else {"result_link": result["result_link"]},
-            # NOTE: this assumes links are the only result type
-        )
+            return (None, None)
+        else:
+            job_status = JobStatus[result["status"]]
+            output = (
+                None
+                if job_status != JobStatus.successful
+                else {"result_link": result["result_link"]}
+                # NOTE: this assumes links are the only result type
+            )
+            return (job_status, output)
 
     def delete_job(self, processid, job_id):
         """
@@ -252,7 +252,6 @@ class KubernetesManager(BaseManager):
             api_version="batch/v1",
             kind="Job",
             metadata=k8s_client.V1ObjectMeta(
-                # TODO: job name should include user id
                 name=k8s_job_name(user_uuid=self.user_uuid, job_id=job_id),
                 annotations={
                     format_annotation_key(k): v for k, v in annotations.items()
@@ -265,7 +264,6 @@ class KubernetesManager(BaseManager):
             ),
         )
 
-        # TODO: add metadata annotations (make sure status as enum)
         self.batch_v1.create_namespaced_job(body=job, namespace=self.namespace)
 
         LOGGER.info("Add job %s in ns %s", job.metadata.name, self.namespace)
@@ -301,7 +299,6 @@ def _job_prefix(user_uuid: str) -> str:
 
 
 def k8s_job_name(user_uuid: str, job_id: str) -> str:
-    # TODO: include process id?
     return f"{_job_prefix(user_uuid)}-{job_id}"
 
 
