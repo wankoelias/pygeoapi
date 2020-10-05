@@ -51,6 +51,7 @@ class KubernetesProcessor(BaseProcessor):
         self,
         data: Dict,
         user_uuid: str,
+        user_email: str,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         """
         Returns a definition of a job as well as result handling.
@@ -78,6 +79,7 @@ class KubernetesManager(BaseManager):
         self.batch_v1 = k8s_client.BatchV1Api()
 
         self.user_uuid = manager_def["user_uuid"]
+        self.user_email = manager_def["user_email"]
 
     def get_jobs(self, processid=None, status=None):
         """
@@ -237,7 +239,9 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
-        spec, result = p.create_job_pod_spec(data=data_dict, user_uuid=self.user_uuid)
+        spec, result = p.create_job_pod_spec(
+            data=data_dict, user_uuid=self.user_uuid, user_email=self.user_email
+        )
 
         annotations = {
             "identifier": job_id,
@@ -272,7 +276,7 @@ class KubernetesManager(BaseManager):
 
     @cached_property
     def namespace(self):
-        # getting the current namespace like this is documented here, so it should be fine:
+        # getting the current namespace like this is documented, so it should be fine:
         # https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/
         return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
 
