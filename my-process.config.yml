@@ -45,7 +45,7 @@ server:
     manager: # TODO: k8s
         name: pygeoapi.process.manager.kubernetes.KubernetesManager
         user_uuid: "0c0a0ef4-8d0d-4e70-b002-033c7cbb41fd"
-
+        user_email: "mallinger.bernhard@eox.at"
 
 logging:
     level: DEBUG
