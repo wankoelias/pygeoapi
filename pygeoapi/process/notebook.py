@@ -27,6 +27,7 @@
 #
 # =================================================================
 
+from datetime import datetime
 import logging
 from pathlib import Path
 import re
@@ -126,8 +127,9 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         cpu_limit = "2"
         memory_limit = "4G"
 
-        # TODO: include date(time)
-        output_notebook = re.sub(".ipynb$", "", notebook_path) + "_result.ipynb"
+        filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
+        now_formatted = datetime.now().strftime("%y%m%d-%H%M")
+        output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
         container = k8s_client.V1Container(
             name=job_name,
@@ -182,7 +184,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     #   related fix from last year:
                     # https://github.com/jupyterlab/jupyterlab/pull/6773
                     "https://edc-jupyter.hub.eox.at/hub/user-redirect/lab/tree/"
-                    + urllib.parse.quote(output_notebook),
+                    + urllib.parse.quote(output_notebook)
                 ),
             },
         )
