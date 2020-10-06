@@ -136,12 +136,12 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         profile = retrieve_profile(user_uuid=user_uuid, user_email=user_email)
 
-        # be a bit smart to select kernel (this should do for now,
+        # be a bit smart to select kernel (this should do for now)
         is_gpu = profile.image.split(":")[0].endswith("-g")
         kernel = "edc-gpu" if is_gpu else "edc"
 
         filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
-        now_formatted = datetime.now().strftime("%y%m%d-%H%M")
+        now_formatted = datetime.now().strftime("%y%m%d-%H%M%S")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
         container = k8s_client.V1Container(
