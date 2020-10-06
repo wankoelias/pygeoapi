@@ -216,10 +216,14 @@ class KubernetesManager(BaseManager):
             # TODO: investigate if list_namespaced_job(watch=True) can be used here
             time.sleep(2)
             result = self.get_job_result(processid=p.metadata["id"], jobid=job_id)
-            if result:
-                status = JobStatus[result["status"]]
-                if status not in (JobStatus.running, JobStatus.accepted):
-                    break
+            if not result:
+                LOGGER.warning(f"Job {job_id} has vanished")
+                status = JobStatus.failed
+                break
+
+            status = JobStatus[result["status"]]
+            if status not in (JobStatus.running, JobStatus.accepted):
+                break
 
         return (
             self.get_job_output(processid=p.metadata["id"], job_id=job_id)[1],
