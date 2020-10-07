@@ -55,8 +55,8 @@ customer_operator_auth = HTTPBasicAuth(
 #: Process metadata and description
 PROCESS_METADATA = {
     "version": "0.1.0",
-    "id": "notebook",
-    "title": "Process notebooks on kubernetes with papermill",
+    "id": "execute-notebook",
+    "title": "notebooks on kubernetes with papermill",
     "description": "",
     "keywords": ["notebook"],
     "links": [
