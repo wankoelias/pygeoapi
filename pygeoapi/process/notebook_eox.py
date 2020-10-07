@@ -136,8 +136,7 @@ class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
         now_formatted = datetime.now().strftime("%y%m%d-%H%M%S")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
-
-        #TODO: affinity?
+        # TODO: affinity?
 
         container = k8s_client.V1Container(
             name=job_name,
@@ -145,7 +144,9 @@ class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
             command=[
                 "bash",  # NOTE: currently bash is not used here
                 "-c",
-                f"papermill "
+                "papermill "
+                "--request-save-on-cell-execute "
+                "--autosave-cell-every 60 "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
                 f'-b "{parameters}" ',
