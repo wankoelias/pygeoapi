@@ -90,4 +90,6 @@ resources:
         type: process
         processor:
           name: pygeoapi.process.notebook.PapermillNotebookKubernetesProcessor
+          nfs_server: ""
+          nfs_share: ""
 
