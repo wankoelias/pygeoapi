@@ -113,6 +113,7 @@ HOME_PVC = os.environ["HOME_PVC"]
 IMAGE_PULL_SECRETS = os.environ["IMAGE_PULL_SECRETS"]
 
 
+# TODO: probably unify with other notebook process. the difference is only under the hood
 class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
