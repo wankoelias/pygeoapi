@@ -282,6 +282,8 @@ class KubernetesManager(BaseManager):
     def namespace(self):
         # getting the current namespace like this is documented, so it should be fine:
         # https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/
+
+        # TODO: when using user namespace, use uuid by default here
         return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
 
 
