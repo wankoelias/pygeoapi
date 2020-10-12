@@ -69,7 +69,7 @@ echo "openapi.yml generated continue to pygeoapi"
 case ${entry_cmd} in
 	# Run Unit tests
 	test)
-	  for test_py in $(ls tests/test_*.py)
+	  for test_py in ${2:-$(ls tests/test_*.py)}
 	  do
 	    # Skip tests requireing backend server or libs installed
 	    case ${test_py} in
