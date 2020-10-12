@@ -77,7 +77,7 @@ class TinyDBManager(BaseManager):
         self.db.purge()
         self.db.close()
         return True
-:
+
     def get_jobs(self, processid=None, status=None):
         """
         Get jobs
