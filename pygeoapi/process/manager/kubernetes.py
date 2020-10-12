@@ -189,7 +189,18 @@ class KubernetesManager(BaseManager):
         :returns: `bool` of status result
         """
 
-        raise NotImplementedError()
+        try:
+            self.batch_v1.delete_namespaced_job(
+                name=k8s_job_name(user_uuid=self.user_uuid, job_id=job_id),
+                namespace=self.namespace,
+            )
+        except kubernetes.client.rest.ApiException as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return False
+            else:
+                raise
+        else:
+            return True
 
     def delete_jobs(self, max_jobs, older_than):
         """
