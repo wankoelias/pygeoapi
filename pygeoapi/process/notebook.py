@@ -118,7 +118,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         self.nfs_server = processor_def["nfs_server"]
         self.nfs_share = processor_def["nfs_share"]
 
-
     def create_job_pod_spec(
         self,
         data: Dict,
@@ -180,7 +179,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             args=[
                 "sh",
                 "-c",
-                "sleep 1; while pgrep -x papermill > /dev/null; do sleep 1; done",
+                "while ! pgrep -x papermill > /dev/null; do sleep 1; done; "
+                "echo 'job start detected'; "
+                "while pgrep -x papermill > /dev/null; do sleep 1; done; "
+                "echo 'job end detected'; ",
             ],
             volume_mounts=[
                 k8s_client.V1VolumeMount(
