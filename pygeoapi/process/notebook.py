@@ -115,6 +115,9 @@ PROCESS_METADATA = {
 class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
+        self.nfs_server = processor_def["nfs_server"]
+        self.nfs_share = processor_def["nfs_share"]
+
 
     def create_job_pod_spec(
         self,
@@ -128,11 +131,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         home = Path("/home/jovyan")
 
-        # TODO: configurable
-        home_pvc = "edc-dev-jupyter-user"
-
-        # TODO: from env
-        home_subpath = f"users/{user_uuid}".replace("-", "-2d")
+        home_subpath = user_uuid.replace("-", "-2d")
 
         profile = retrieve_profile(user_uuid=user_uuid, user_email=user_email)
 
@@ -144,7 +143,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         now_formatted = datetime.now().strftime("%y%m%d-%H%M%S")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
-        container = k8s_client.V1Container(
+        notebook_container = k8s_client.V1Container(
             name=job_name,
             image=profile.image,
             command=[
@@ -159,7 +158,9 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             working_dir=str(home),
             volume_mounts=[
                 k8s_client.V1VolumeMount(
-                    mount_path=str(home), name="home", sub_path=home_subpath
+                    mount_path=str(home),
+                    name="home",
+                    mount_propagation="HostToContainer",
                 ),
             ],
             resources=k8s_client.V1ResourceRequirements(
@@ -171,12 +172,39 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ),
             env=[],
         )
+        nfs_mounter_container = k8s_client.V1Container(
+            name="nfs-mounter",
+            image="totycro/nfs-client:0.2.1",
+            security_context=k8s_client.V1SecurityContext(privileged=True),
+            # 'papermill' is the comm name of the process
+            args=[
+                "sh",
+                "-c",
+                "sleep 1; while pgrep -x papermill > /dev/null; do sleep 1; done",
+            ],
+            volume_mounts=[
+                k8s_client.V1VolumeMount(
+                    name="home",
+                    mount_path="/mnt",
+                    mount_propagation="Bidirectional",
+                ),
+            ],
+            env=[
+                k8s_client.V1EnvVar(
+                    name="MOUNT_TARGET",
+                    value=f"{self.nfs_server}:{self.nfs_share}/{home_subpath}",
+                ),
+                k8s_client.V1EnvVar(name="MOUNT_POINT", value="/mnt"),
+                k8s_client.V1EnvVar(
+                    name="MOUNT_OPTIONS",
+                    value="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport",
+                ),
+            ],
+        )
 
         volumes = [
             k8s_client.V1Volume(
-                persistent_volume_claim=k8s_client.V1PersistentVolumeClaimVolumeSource(
-                    claim_name=home_pvc,
-                ),
+                empty_dir=k8s_client.V1EmptyDirVolumeSource(),
                 name="home",
             ),
         ]
@@ -184,8 +212,16 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         return (
             k8s_client.V1PodSpec(
                 restart_policy="Never",
-                containers=[container],
+                containers=[notebook_container, nfs_mounter_container],
                 volumes=volumes,
+                # NOTE: The nfs client shutdown must succeed, otherwise the pod is
+                #       stuck forever. Sometimes something in k8s seems to keep some
+                #       resource open for many seconds (30-60?), so keep ample time for
+                #       this to timeout./
+                termination_grace_period_seconds=600,
+                # we need this to be able to terminate the nfs sidecar container
+                # https://github.com/kubernetes/kubernetes/issues/25908
+                share_process_namespace=True,
             ),
             {
                 "result_type": "link",
