@@ -170,7 +170,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         kernel = "edc-gpu" if is_gpu else "edc"
 
         filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
-        now_formatted = datetime.now().strftime("%y%m%d-%H%M%S")
+        now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
         cpu_limit = data["cpu_limit"] or profile.cpu_limit / 2
