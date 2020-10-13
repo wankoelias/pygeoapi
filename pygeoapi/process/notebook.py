@@ -71,7 +71,7 @@ PROCESS_METADATA = {
     "inputs": [
         {
             "id": "notebook",
-            "title": "notebook file",
+            "title": "notebook file (path relative to home)",
             "abstract": "notebook file",
             "input": {
                 "literalDataDomain": {
@@ -82,11 +82,11 @@ PROCESS_METADATA = {
             "minOccurs": 1,
             "maxOccurs": 1,
             "metadata": None,  # TODO how to use?
-            "keywords": ["notebook"],
+            "keywords": [""],
         },
         {
             "id": "parameters",
-            "title": "parameters",
+            "title": "parameters (base64 encoded yaml)",
             "abstract": "parameters for notebook execution.",
             "input": {
                 "literalDataDomain": {
@@ -97,7 +97,37 @@ PROCESS_METADATA = {
             "minOccurs": 0,
             "maxOccurs": 1,
             "metadata": None,
-            "keywords": ["message"],
+            "keywords": [""],
+        },
+        {
+            "id": "cpu_limit",
+            "title": "CPU limit (default: half of your EOxHub limit)",
+            "abstract": "Number of CPUs to use for this job",
+            "input": {
+                "literalDataDomain": {
+                    "dataType": "float",
+                    "valueDefinition": {"anyValue": True, "uom": "Number of CPUs"},
+                }
+            },
+            "minOccurs": 0,
+            "maxOccurs": 1,
+            "metadata": None,
+            "keywords": [""],
+        },
+        {
+            "id": "mem_limit",
+            "title": "Memory limit  in GiB (default: half of your EOxHub limit)",
+            "abstract": "Amount of memory to use for this job",
+            "input": {
+                "literalDataDomain": {
+                    "dataType": "float",
+                    "valueDefinition": {"anyValue": True, "uom": "GiB"},
+                }
+            },
+            "minOccurs": 0,
+            "maxOccurs": 1,
+            "metadata": None,
+            "keywords": [""],
         },
     ],
     "outputs": [
@@ -124,6 +154,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         user_uuid: str,
         user_email: str,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
+        LOGGER.debug("Starting job with data %s", data)
         notebook_path = data["notebook"]
         parameters = data["parameters"]
         job_name = "job-notebook"
@@ -141,6 +172,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
         now_formatted = datetime.now().strftime("%y%m%d-%H%M%S")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
+
+        cpu_limit = data["cpu_limit"] or profile.cpu_limit / 2
+        mem_limit = "{}Gi".format(
+            data["mem_limit"] or (profile.mem_limit / 2 / (1024 ** 3))
+        )
 
         notebook_container = k8s_client.V1Container(
             name=job_name,
@@ -163,10 +199,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 ),
             ],
             resources=k8s_client.V1ResourceRequirements(
-                limits={"cpu": profile.cpu_limit, "memory": profile.mem_limit},
+                limits={"cpu": cpu_limit, "memory": mem_limit},
                 requests={
-                    "cpu": profile.cpu_guarantee,
-                    "memory": profile.mem_guarantee,
+                    "cpu": cpu_limit,
+                    "memory": mem_limit,
                 },
             ),
             env=[],
@@ -191,6 +227,13 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     mount_propagation="Bidirectional",
                 ),
             ],
+            resources=k8s_client.V1ResourceRequirements(
+                limits={"cpu": "0.1", "memory": "100Mi"},
+                requests={
+                    "cpu": "0.1",
+                    "memory": "100Mi",
+                },
+            ),
             env=[
                 k8s_client.V1EnvVar(
                     name="MOUNT_TARGET",
@@ -248,10 +291,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 @dataclass(frozen=True)
 class EDCProfile:
     image: str
-    mem_limit: str
-    mem_guarantee: str
-    cpu_limit: str
-    cpu_guarantee: str
+    mem_limit: int
+    mem_guarantee: int
+    cpu_limit: float
+    cpu_guarantee: float
 
     @classmethod
     def from_superset(cls, d: Dict) -> EDCProfile:
