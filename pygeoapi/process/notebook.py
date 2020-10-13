@@ -192,8 +192,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f"/opt/conda/envs/*/bin/papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
-                f"-k {kernel} "
-                + (f'-b "{parameters} " ' if parameters else "")
+                f"-k {kernel} " + (f'-b "{parameters} " ' if parameters else ""),
             ],
             working_dir=str(home),
             volume_mounts=[
@@ -250,6 +249,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     name="MOUNT_OPTIONS",
                     value="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport",
                 ),
+                # due to the shared process namespace, tini is not PID 1, so we need:
+                k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),
             ],
         )
 
