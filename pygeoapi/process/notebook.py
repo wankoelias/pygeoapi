@@ -151,7 +151,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f"/opt/conda/envs/*/bin/papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
-                f'-b "{parameters}" '
+                + (f'-b "{parameters}" ' if parameters else "") +
                 f"-k {kernel}",
             ],
             working_dir=str(home),
