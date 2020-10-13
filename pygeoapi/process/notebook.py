@@ -184,11 +184,16 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             command=[
                 "bash",
                 "-c",
+                # we actually need to wait for the mount because it's a sidecar container
+                'echo "`date` waiting for mount"; '
+                # just check if any file is present
+                "while ! ls ~ | read; do sleep 1; done; "
+                'echo "`date` starting papermill"; '
                 f"/opt/conda/envs/*/bin/papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
-                + (f'-b "{parameters}" ' if parameters else "") +
-                f"-k {kernel}",
+                f"-k {kernel} "
+                + (f'-b "{parameters} " ' if parameters else "")
             ],
             working_dir=str(home),
             volume_mounts=[
@@ -215,10 +220,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             args=[
                 "sh",
                 "-c",
+                'echo "`date` waiting for job start"; '
                 "while ! pgrep -x papermill > /dev/null; do sleep 1; done; "
-                "echo 'job start detected'; "
+                'echo "`date` job start detected"; '
                 "while pgrep -x papermill > /dev/null; do sleep 1; done; "
-                "echo 'job end detected'; ",
+                'echo "`date` job end detected"; ',
             ],
             volume_mounts=[
                 k8s_client.V1VolumeMount(
