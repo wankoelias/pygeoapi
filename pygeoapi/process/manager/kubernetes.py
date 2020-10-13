@@ -28,7 +28,6 @@
 # =================================================================
 
 from datetime import datetime
-from functools import cached_property
 from http import HTTPStatus
 import logging
 import re
@@ -80,6 +79,11 @@ class KubernetesManager(BaseManager):
 
         self.user_uuid = manager_def["user_uuid"]
         self.user_email = manager_def["user_email"]
+        self.namespace = (
+            self.user_uuid
+            if manager_def["jobs_in_user_namespace"]
+            else current_namespace()
+        )
 
     def get_jobs(self, processid=None, status=None):
         """
@@ -289,14 +293,6 @@ class KubernetesManager(BaseManager):
 
         return (None, JobStatus.accepted)
 
-    @cached_property
-    def namespace(self):
-        # getting the current namespace like this is documented, so it should be fine:
-        # https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/
-
-        # TODO: when using user namespace, use uuid by default here
-        return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
-
 
 _ANNOTATIONS_PREFIX = "pygeoapi_"
 
@@ -370,3 +366,11 @@ def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
         **metadata_from_annotation,
         **computed_metadata,
     }
+
+
+def current_namespace():
+    # getting the current namespace like this is documented, so it should be fine:
+    # https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/
+
+    # TODO: when using user namespace, use uuid by default here
+    return open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
