@@ -161,8 +161,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         home = Path("/home/jovyan")
 
-        home_subpath = user_uuid.replace("-", "-2d")
-
         profile = retrieve_profile(user_uuid=user_uuid, user_email=user_email)
 
         # be a bit smart to select kernel (this should do for now)
@@ -184,11 +182,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             command=[
                 "bash",
                 "-c",
-                # we actually need to wait for the mount because it's a sidecar container
-                'echo "`date` waiting for mount"; '
-                # just check if any file is present
-                "while ! ls ~ | read; do sleep 1; done; "
-                'echo "`date` starting papermill"; '
                 f"/opt/conda/envs/*/bin/papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
@@ -199,7 +192,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 k8s_client.V1VolumeMount(
                     mount_path=str(home),
                     name="home",
-                    mount_propagation="HostToContainer",
                 ),
             ],
             resources=k8s_client.V1ResourceRequirements(
@@ -215,52 +207,12 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 k8s_client.V1EnvVar(name="JUPYTER_IMAGE", value=profile.image),
             ],
         )
-        nfs_mounter_container = k8s_client.V1Container(
-            name="nfs-mounter",
-            image="totycro/nfs-client:0.2.1",
-            security_context=k8s_client.V1SecurityContext(privileged=True),
-            # 'papermill' is the comm name of the process
-            args=[
-                "sh",
-                "-c",
-                'echo "`date` waiting for job start"; '
-                "while ! pgrep -x papermill > /dev/null; do sleep 1; done; "
-                'echo "`date` job start detected"; '
-                "while pgrep -x papermill > /dev/null; do sleep 1; done; "
-                'echo "`date` job end detected"; ',
-            ],
-            volume_mounts=[
-                k8s_client.V1VolumeMount(
-                    name="home",
-                    mount_path="/mnt",
-                    mount_propagation="Bidirectional",
-                ),
-            ],
-            resources=k8s_client.V1ResourceRequirements(
-                limits={"cpu": "0.1", "memory": "100Mi"},
-                requests={
-                    "cpu": "0.1",
-                    "memory": "100Mi",
-                },
-            ),
-            env=[
-                k8s_client.V1EnvVar(
-                    name="MOUNT_TARGET",
-                    value=f"{self.nfs_server}:{self.nfs_share}/{home_subpath}",
-                ),
-                k8s_client.V1EnvVar(name="MOUNT_POINT", value="/mnt"),
-                k8s_client.V1EnvVar(
-                    name="MOUNT_OPTIONS",
-                    value="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport",
-                ),
-                # due to the shared process namespace, tini is not PID 1, so we need:
-                k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),
-            ],
-        )
 
         volumes = [
             k8s_client.V1Volume(
-                empty_dir=k8s_client.V1EmptyDirVolumeSource(),
+                persistent_volume_claim=k8s_client.V1PersistentVolumeClaimVolumeSource(
+                    claim_name="user"
+                ),
                 name="home",
             ),
         ]
@@ -268,16 +220,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         return (
             k8s_client.V1PodSpec(
                 restart_policy="Never",
-                containers=[notebook_container, nfs_mounter_container],
+                containers=[notebook_container],
                 volumes=volumes,
-                # NOTE: The nfs client shutdown must succeed, otherwise the pod is
-                #       stuck forever. Sometimes something in k8s seems to keep some
-                #       resource open for many seconds (30-60?), so keep ample time for
-                #       this to timeout./
-                termination_grace_period_seconds=600,
-                # we need this to be able to terminate the nfs sidecar container
-                # https://github.com/kubernetes/kubernetes/issues/25908
-                share_process_namespace=True,
             ),
             {
                 "result_type": "link",
