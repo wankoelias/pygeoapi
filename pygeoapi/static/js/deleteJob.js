@@ -2,7 +2,7 @@
  *
  * Authors: Bernhard Mallinger <bernhard.mallinger@eox.at>
  *
- * Copyright (c) 2020 Bernhard Mallinger
+ * Copyright (C) 2020 EOX IT Services GmbH <https://eox.at>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
