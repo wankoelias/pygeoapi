@@ -117,5 +117,3 @@ COPY ./docker/entrypoint.sh /entrypoint.sh
 
 WORKDIR /pygeoapi
 ENTRYPOINT ["/entrypoint.sh"]
-
-COPY ./my-process.config.yml /pygeoapi/local.config.yml
