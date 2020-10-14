@@ -123,6 +123,7 @@ class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
         data: Dict,
         user_uuid: str,
         user_email: str,
+        **kwargs,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         notebook_path = data["notebook"]
         parameters = data["parameters"]
