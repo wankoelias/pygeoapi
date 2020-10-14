@@ -142,7 +142,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         self,
         data: Dict,
         user_uuid: str,
-        user_email: str,
         retrieve_global_limits,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         LOGGER.debug("Starting job with data %s", data)

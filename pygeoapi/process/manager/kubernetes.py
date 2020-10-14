@@ -53,7 +53,6 @@ class KubernetesProcessor(BaseProcessor):
         self,
         data: Dict,
         user_uuid: str,
-        user_email: str,
         retrieve_global_limits,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         """
@@ -83,7 +82,6 @@ class KubernetesManager(BaseManager):
         self.core_api = k8s_client.CoreV1Api()
 
         self.user_uuid = manager_def["user_uuid"]
-        self.user_email = manager_def["user_email"]
         self.namespace = (
             self.user_uuid
             if manager_def["jobs_in_user_namespace"]
@@ -273,7 +271,6 @@ class KubernetesManager(BaseManager):
         spec, result = p.create_job_pod_spec(
             data=data_dict,
             user_uuid=self.user_uuid,
-            user_email=self.user_email,
             retrieve_global_limits=retrieve_global_limits,
         )
 
