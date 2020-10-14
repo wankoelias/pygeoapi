@@ -209,7 +209,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     "memory": mem_limit,
                 },
             ),
-            env=[],
+            env=[
+                # this is provided in jupyter worker containers and we also use it
+                # for compatibility checks
+                k8s_client.V1EnvVar(name="JUPYTER_IMAGE", value=profile.image),
+            ],
         )
         nfs_mounter_container = k8s_client.V1Container(
             name="nfs-mounter",
