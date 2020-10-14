@@ -45,12 +45,16 @@ from pygeoapi.process.manager.base import BaseManager, DATETIME_FORMAT
 LOGGER = logging.getLogger(__name__)
 
 
+RESOURCE_QUOTA_NAME = "eoxhub"
+
+
 class KubernetesProcessor(BaseProcessor):
     def create_job_pod_spec(
         self,
         data: Dict,
         user_uuid: str,
         user_email: str,
+        retrieve_global_limits,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         """
         Returns a definition of a job as well as result handling.
@@ -76,6 +80,7 @@ class KubernetesManager(BaseManager):
             k8s_config.load_incluster_config()
 
         self.batch_v1 = k8s_client.BatchV1Api()
+        self.core_api = k8s_client.CoreV1Api()
 
         self.user_uuid = manager_def["user_uuid"]
         self.user_email = manager_def["user_email"]
@@ -258,8 +263,18 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
+
+        def retrieve_global_limits():
+            limits = self.core_api.read_namespaced_resource_quota(
+                name=RESOURCE_QUOTA_NAME, namespace=self.namespace
+            ).spec.hard
+            return {k: limits[f"limits.{k}"] for k in ("cpu", "memory")}
+
         spec, result = p.create_job_pod_spec(
-            data=data_dict, user_uuid=self.user_uuid, user_email=self.user_email
+            data=data_dict,
+            user_uuid=self.user_uuid,
+            user_email=self.user_email,
+            retrieve_global_limits=retrieve_global_limits,
         )
 
         annotations = {

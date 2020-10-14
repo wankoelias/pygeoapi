@@ -153,6 +153,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         data: Dict,
         user_uuid: str,
         user_email: str,
+        retrieve_global_limits,
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         LOGGER.debug("Starting job with data %s", data)
         notebook_path = data["notebook"]
@@ -171,10 +172,17 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
-        cpu_limit = data["cpu_limit"] or profile.cpu_limit / 2
-        mem_limit = "{}Gi".format(
-            data["mem_limit"] or (profile.mem_limit / 2 / (1024 ** 3))
-        )
+        global_limits = retrieve_global_limits()
+
+        cpu_limit = data["cpu_limit"] or float(global_limits["cpu"]) / 2
+        try:
+            memory_limit = f"{data['mem_limit']}Gi"
+        except KeyError:
+            # get number from global limit and half it
+            value, unit = re.match(
+                r"^\s*([.\d]+)\s*(\D*)\s*$", global_limits["memory"]
+            ).groups()
+            memory_limit = f"{float(value) / 2}{unit}"
 
         notebook_container = k8s_client.V1Container(
             name=job_name,
@@ -195,10 +203,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 ),
             ],
             resources=k8s_client.V1ResourceRequirements(
-                limits={"cpu": cpu_limit, "memory": mem_limit},
+                limits={"cpu": cpu_limit, "memory": memory_limit},
                 requests={
                     "cpu": cpu_limit,
-                    "memory": mem_limit,
+                    "memory": memory_limit,
                 },
             ),
             env=[
