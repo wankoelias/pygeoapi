@@ -29,28 +29,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
 from datetime import datetime
 import logging
 from pathlib import Path
-import os
 import re
 from typing import Dict, Tuple
 import urllib.parse
 
 from kubernetes import client as k8s_client
-import requests
-from requests.models import HTTPBasicAuth
 
 from pygeoapi.process.manager.kubernetes import KubernetesProcessor
 
 LOGGER = logging.getLogger(__name__)
 
-# move to some config file?
-customer_operator_auth = HTTPBasicAuth(
-    username=os.environ["CUSTOMER_OPERATOR_USER"],
-    password=os.environ["CUSTOMER_OPERATOR_PASSWORD"],
-)
 
 #: Process metadata and description
 PROCESS_METADATA = {
@@ -145,8 +136,7 @@ PROCESS_METADATA = {
 class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
-        self.nfs_server = processor_def["nfs_server"]
-        self.nfs_share = processor_def["nfs_share"]
+        self.default_image = processor_def["default_image"]
 
     def create_job_pod_spec(
         self,
@@ -162,10 +152,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         home = Path("/home/jovyan")
 
-        profile = retrieve_profile(user_uuid=user_uuid, user_email=user_email)
+        # TODO: allow override from parameter
+        image = self.default_image
 
         # be a bit smart to select kernel (this should do for now)
-        is_gpu = profile.image.split(":")[0].endswith("-g")
+        is_gpu = image.split(":")[0].endswith("-g")
         kernel = "edc-gpu" if is_gpu else "edc"
 
         filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
@@ -186,7 +177,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         notebook_container = k8s_client.V1Container(
             name=job_name,
-            image=profile.image,
+            image=image,
             command=[
                 "bash",
                 "-c",
@@ -212,7 +203,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             env=[
                 # this is provided in jupyter worker containers and we also use it
                 # for compatibility checks
-                k8s_client.V1EnvVar(name="JUPYTER_IMAGE", value=profile.image),
+                k8s_client.V1EnvVar(name="JUPYTER_IMAGE", value=image),
             ],
         )
 
@@ -249,35 +240,3 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
     def __repr__(self):
         return "<PapermillNotebookKubernetesProcessor> {}".format(self.name)
-
-
-@dataclass(frozen=True)
-class EDCProfile:
-    image: str
-    mem_limit: int
-    mem_guarantee: int
-    cpu_limit: float
-    cpu_guarantee: float
-
-    @classmethod
-    def from_superset(cls, d: Dict) -> EDCProfile:
-        field_names = [field.name for field in fields(cls)]
-        return cls(**{k: v for k, v in d.items() if k in field_names})
-
-
-def retrieve_profile(user_uuid: str, user_email: str) -> EDCProfile:
-    LOGGER.debug(f"Retrieving profiles for {user_uuid} {user_email}")
-    profiles = requests.get(
-        f"https://customer-operator.dev.hub.eox.at/tenants/{user_uuid}/profiles?"
-        f"email={urllib.parse.quote(user_email)}",
-        auth=customer_operator_auth,
-    ).json()
-
-    LOGGER.debug("Got profiles %s", profiles)
-
-    try:
-        profile = profiles[0]
-    except KeyError as e:
-        raise RuntimeError("No active user profile found") from e
-
-    return EDCProfile.from_superset(profile)
