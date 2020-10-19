@@ -164,8 +164,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         global_limits = retrieve_global_limits()
 
-        cpu_limit = data["cpu_limit"] or float(global_limits["cpu"]) / 2
-        if memory_limit_param := data["mem_limit"]:
+        cpu_limit = data.get("cpu_limit") or float(global_limits["cpu"]) / 2
+        if memory_limit_param := data.get("mem_limit"):
             memory_limit = f"{memory_limit_param}Gi"
         else:
             # get number from global limit and half it
