@@ -137,6 +137,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
         self.default_image = processor_def["default_image"]
+        self.s3_bucket_config = processor_def.get("s3_bucket")
 
     def create_job_pod_spec(
         self,
@@ -174,6 +175,86 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ).groups()
             memory_limit = f"{float(value) / 2}{unit}"
 
+        extra_containers, extra_volume_mounts, extra_volumes = [], [], []
+
+        if self.s3_bucket_config:
+            s3_user_bucket_volume_name = "s3-user-bucket"
+            extra_volume_mounts.append(
+                k8s_client.V1VolumeMount(
+                    mount_path="/home/jovyan/s3",
+                    name=s3_user_bucket_volume_name,
+                    mount_propagation="HostToContainer",
+                )
+            )
+            extra_volumes.append(
+                k8s_client.V1Volume(
+                    name=s3_user_bucket_volume_name,
+                    empty_dir=k8s_client.V1EmptyDirVolumeSource(),
+                )
+            )
+            extra_containers.append(
+                k8s_client.V1Container(
+                    name="s3mounter",
+                    image="totycro/s3fs:0.4.0-1.86",
+                    # we need to detect the end of the job here, this container
+                    # must end for the job to be considered done by k8s
+                    # 'papermill' is the comm name of the process
+                    args=[
+                        "sh",
+                        "-c",
+                        'echo "`date` waiting for job start"; '
+                        "while ! pgrep -x papermill > /dev/null; do sleep 1; done; "
+                        'echo "`date` job start detected"; '
+                        "while pgrep -x papermill > /dev/null; do sleep 1; done; "
+                        'echo "`date` job end detected"; ',
+                    ],
+                    security_context=k8s_client.V1SecurityContext(privileged=True),
+                    volume_mounts=[
+                        k8s_client.V1VolumeMount(
+                            name=s3_user_bucket_volume_name,
+                            mount_path="/opt/s3fs/bucket",
+                            mount_propagation="Bidirectional",
+                        ),
+                    ],
+                    resources=k8s_client.V1ResourceRequirements(
+                        limits={"cpu": "0.2", "memory": "128Mi"},
+                        requests={
+                            "cpu": "0.05",
+                            "memory": "32Mi",
+                        },
+                    ),
+                    env=[
+                        k8s_client.V1EnvVar(name="S3FS_ARGS", value="-oallow_other"),
+                        k8s_client.V1EnvVar(name="UID", value="1000"),
+                        k8s_client.V1EnvVar(name="GID", value="2014"),
+                        k8s_client.V1EnvVar(
+                            name="AWS_S3_ACCESS_KEY_ID",
+                            value_from=k8s_client.V1EnvVarSource(
+                                secret_key_ref=k8s_client.V1SecretKeySelector(
+                                    name=self.s3_bucket_config["secret"],
+                                    key="username",
+                                )
+                            ),
+                        ),
+                        k8s_client.V1EnvVar(
+                            name="AWS_S3_SECRET_ACCESS_KEY",
+                            value_from=k8s_client.V1EnvVarSource(
+                                secret_key_ref=k8s_client.V1SecretKeySelector(
+                                    name=self.s3_bucket_config["secret"],
+                                    key="password",
+                                )
+                            ),
+                        ),
+                        k8s_client.V1EnvVar(
+                            "AWS_S3_BUCKET",
+                            self.s3_bucket_config["name"],
+                        ),
+                        # due to the shared process namespace, tini is not PID 1, so:
+                        k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),
+                    ],
+                )
+            )
+
         notebook_container = k8s_client.V1Container(
             name=job_name,
             image=image,
@@ -191,7 +272,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     mount_path=str(home),
                     name="home",
                 ),
-            ],
+            ]
+            + extra_volume_mounts,
             resources=k8s_client.V1ResourceRequirements(
                 limits={"cpu": cpu_limit, "memory": memory_limit},
                 requests={
@@ -213,13 +295,16 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 ),
                 name="home",
             ),
-        ]
+        ] + extra_volumes
 
         return (
             k8s_client.V1PodSpec(
                 restart_policy="Never",
-                containers=[notebook_container],
+                containers=[notebook_container] + extra_containers,
                 volumes=volumes,
+                # we need this to be able to terminate the sidecar container
+                # https://github.com/kubernetes/kubernetes/issues/25908
+                share_process_namespace=True,
             ),
             {
                 "result_type": "link",
