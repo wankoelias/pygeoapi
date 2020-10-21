@@ -33,7 +33,7 @@ from datetime import datetime
 import logging
 from pathlib import Path
 import re
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 import urllib.parse
 
 from kubernetes import client as k8s_client
@@ -137,13 +137,13 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
         self.default_image = processor_def["default_image"]
-        self.s3_bucket_config = processor_def.get("s3_bucket")
 
     def create_job_pod_spec(
         self,
         data: Dict,
         user_uuid: str,
         retrieve_global_limits,
+        s3_bucket_config: Optional[KubernetesProcessor.S3BucketConfig],
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         LOGGER.debug("Starting job with data %s", data)
         notebook_path = data["notebook"]
@@ -177,7 +177,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         extra_containers, extra_volume_mounts, extra_volumes = [], [], []
 
-        if self.s3_bucket_config:
+        if s3_bucket_config:
             s3_user_bucket_volume_name = "s3-user-bucket"
             extra_volume_mounts.append(
                 k8s_client.V1VolumeMount(
@@ -231,7 +231,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                             name="AWS_S3_ACCESS_KEY_ID",
                             value_from=k8s_client.V1EnvVarSource(
                                 secret_key_ref=k8s_client.V1SecretKeySelector(
-                                    name=self.s3_bucket_config["secret"],
+                                    name=s3_bucket_config.secret_name,
                                     key="username",
                                 )
                             ),
@@ -240,14 +240,13 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                             name="AWS_S3_SECRET_ACCESS_KEY",
                             value_from=k8s_client.V1EnvVarSource(
                                 secret_key_ref=k8s_client.V1SecretKeySelector(
-                                    name=self.s3_bucket_config["secret"],
+                                    name=s3_bucket_config.secret_name,
                                     key="password",
                                 )
                             ),
                         ),
                         k8s_client.V1EnvVar(
-                            "AWS_S3_BUCKET",
-                            self.s3_bucket_config["name"],
+                            "AWS_S3_BUCKET", s3_bucket_config.bucket_name,
                         ),
                         # due to the shared process namespace, tini is not PID 1, so:
                         k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),

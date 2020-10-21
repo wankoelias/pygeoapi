@@ -27,12 +27,15 @@
 #
 # =================================================================
 
+from __future__ import annotations
+
 from datetime import datetime
 from http import HTTPStatus
 import logging
 import re
 import time
 from typing import Dict, Optional, Tuple
+from dataclasses import dataclass
 
 from kubernetes import client as k8s_client, config as k8s_config
 import kubernetes.client.rest
@@ -47,13 +50,21 @@ LOGGER = logging.getLogger(__name__)
 
 RESOURCE_QUOTA_NAME = "eoxhub"
 
+S3_BUCKET_SECRET_NAME = "s3-bucket"
+
 
 class KubernetesProcessor(BaseProcessor):
+    @dataclass(frozen=True)
+    class S3BucketConfig:
+        bucket_name: str
+        secret_name: str
+
     def create_job_pod_spec(
         self,
         data: Dict,
         user_uuid: str,
         retrieve_global_limits,
+        s3_bucket_config: Optional[KubernetesProcessor.S3BucketConfig],
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         """
         Returns a definition of a job as well as result handling.
@@ -272,6 +283,7 @@ class KubernetesManager(BaseManager):
             data=data_dict,
             user_uuid=self.user_uuid,
             retrieve_global_limits=retrieve_global_limits,
+            s3_bucket_config=self._get_s3_bucket_config(),
         )
 
         annotations = {
@@ -304,6 +316,22 @@ class KubernetesManager(BaseManager):
         LOGGER.info("Add job %s in ns %s", job.metadata.name, self.namespace)
 
         return (None, JobStatus.accepted)
+
+    def _get_s3_bucket_config(self) -> Optional[KubernetesProcessor.S3BucketConfig]:
+        try:
+            s3_secret = self.core_api.read_namespaced_secret(
+                S3_BUCKET_SECRET_NAME, self.namespace
+            )
+        except kubernetes.client.rest.ApiException as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return None
+            else:
+                raise
+        else:
+            return KubernetesProcessor.S3BucketConfig(
+                bucket_name=s3_secret.metadata.owner_references[0].name,
+                secret_name=S3_BUCKET_SECRET_NAME,
+            )
 
 
 _ANNOTATIONS_PREFIX = "pygeoapi_"
