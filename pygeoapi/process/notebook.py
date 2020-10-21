@@ -250,6 +250,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                         ),
                         # due to the shared process namespace, tini is not PID 1, so:
                         k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),
+                        k8s_client.V1EnvVar(
+                            name="AWS_S3_URL",
+                            value="https://s3-eu-central-1.amazonaws.com",
+                        ),
                     ],
                 )
             )
