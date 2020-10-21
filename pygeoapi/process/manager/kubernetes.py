@@ -56,7 +56,6 @@ S3_BUCKET_SECRET_NAME = "s3-bucket"
 class KubernetesProcessor(BaseProcessor):
     @dataclass(frozen=True)
     class S3BucketConfig:
-        bucket_name: str
         secret_name: str
 
     def create_job_pod_spec(
@@ -318,10 +317,9 @@ class KubernetesManager(BaseManager):
         return (None, JobStatus.accepted)
 
     def _get_s3_bucket_config(self) -> Optional[KubernetesProcessor.S3BucketConfig]:
+        # TODO: this now returns a very sophisticated bool, possibly refactor
         try:
-            s3_secret = self.core_api.read_namespaced_secret(
-                S3_BUCKET_SECRET_NAME, self.namespace
-            )
+            self.core_api.read_namespaced_secret(S3_BUCKET_SECRET_NAME, self.namespace)
         except kubernetes.client.rest.ApiException as e:
             if e.status == HTTPStatus.NOT_FOUND:
                 return None
@@ -329,7 +327,6 @@ class KubernetesManager(BaseManager):
                 raise
         else:
             return KubernetesProcessor.S3BucketConfig(
-                bucket_name=s3_secret.metadata.owner_references[0].name,
                 secret_name=S3_BUCKET_SECRET_NAME,
             )
 

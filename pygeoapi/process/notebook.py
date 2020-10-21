@@ -137,6 +137,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
         self.default_image = processor_def["default_image"]
+        self.s3_bucket_name = processor_def["s3_bucket_name"]
 
     def create_job_pod_spec(
         self,
@@ -246,7 +247,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                             ),
                         ),
                         k8s_client.V1EnvVar(
-                            "AWS_S3_BUCKET", s3_bucket_config.bucket_name,
+                            "AWS_S3_BUCKET", self.s3_bucket_name,
                         ),
                         # due to the shared process namespace, tini is not PID 1, so:
                         k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),
