@@ -1929,9 +1929,9 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
         :returns: tuple of headers, status code, content
         """
 
-        headers_ = HEADERS.copy()
+        format_ = check_format(args, headers)
 
-        format_ = check_format(args, headers_)
+        headers_ = HEADERS.copy()
 
         if format_ is not None and format_ not in FORMATS:
             exception = {
@@ -1967,7 +1967,7 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
         # MANAGER-NOTE: it's a bit confusing that this method returns processes as well as starts new ones.
         if method == 'GET' and process_id:
             jobs = sorted(self.manager.get_jobs(process_id), key=lambda k: k['process_start_datetime'], reverse=True)
-            if not format_ or format_ == 'html':
+            if format_ == 'html':
                 headers_['Content-Type'] = 'text/html'
                 response = render_j2_template(self.config, 'jobs.html', {'process': {'id': process_id, 'title': process.metadata['title']}, 'jobs': jobs})
                 return headers_, 200, response
