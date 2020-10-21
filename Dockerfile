@@ -106,7 +106,7 @@ RUN \
 	&& apt autoremove -y  \
 	&& rm -rf /var/lib/apt/lists/*
 
-# ADD . /pygeoapi
+ADD . /pygeoapi
 
 COPY ./docker/default.config.yml /pygeoapi/local.config.yml
 COPY ./docker/entrypoint.sh /entrypoint.sh
