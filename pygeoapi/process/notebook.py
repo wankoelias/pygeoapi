@@ -90,36 +90,6 @@ PROCESS_METADATA = {
             "metadata": None,
             "keywords": [""],
         },
-        {
-            "id": "cpu_limit",
-            "title": "CPU limit (default: half of your EOxHub limit)",
-            "abstract": "Number of CPUs to use for this job",
-            "input": {
-                "literalDataDomain": {
-                    "dataType": "float",
-                    "valueDefinition": {"anyValue": True, "uom": "Number of CPUs"},
-                }
-            },
-            "minOccurs": 0,
-            "maxOccurs": 1,
-            "metadata": None,
-            "keywords": [""],
-        },
-        {
-            "id": "mem_limit",
-            "title": "Memory limit  in GiB (default: half of your EOxHub limit)",
-            "abstract": "Amount of memory to use for this job",
-            "input": {
-                "literalDataDomain": {
-                    "dataType": "float",
-                    "valueDefinition": {"anyValue": True, "uom": "GiB"},
-                }
-            },
-            "minOccurs": 0,
-            "maxOccurs": 1,
-            "metadata": None,
-            "keywords": [""],
-        },
     ],
     "outputs": [
         {
@@ -143,7 +113,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         self,
         data: Dict,
         user_uuid: str,
-        retrieve_global_limits,
         s3_bucket_config: Optional[KubernetesProcessor.S3BucketConfig],
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         LOGGER.debug("Starting job with data %s", data)
@@ -164,17 +133,16 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
-        global_limits = retrieve_global_limits()
-
-        cpu_limit = data.get("cpu_limit") or float(global_limits["cpu"]) / 2
-        if memory_limit_param := data.get("mem_limit"):
-            memory_limit = f"{memory_limit_param}Gi"
-        else:
-            # get number from global limit and half it
-            value, unit = re.match(
-                r"^\s*([.\d]+)\s*(\D*)\s*$", global_limits["memory"]
-            ).groups()
-            memory_limit = f"{float(value) / 2}{unit}"
+        resources = k8s_client.V1ResourceRequirements(
+            limits={
+                "cpu": data.get("cpu_limit"),
+                "memory": data.get("memory_limit"),
+            },
+            requests={
+                "cpu": data.get("cpu_requests"),
+                "memory": data.get("memory_requests"),
+            },
+        )
 
         extra_containers, extra_volume_mounts, extra_volumes = [], [], []
 
@@ -247,7 +215,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                             ),
                         ),
                         k8s_client.V1EnvVar(
-                            "AWS_S3_BUCKET", self.s3_bucket_name,
+                            "AWS_S3_BUCKET",
+                            self.s3_bucket_name,
                         ),
                         # due to the shared process namespace, tini is not PID 1, so:
                         k8s_client.V1EnvVar(name="TINI_SUBREAPER", value="1"),
@@ -278,13 +247,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 ),
             ]
             + extra_volume_mounts,
-            resources=k8s_client.V1ResourceRequirements(
-                limits={"cpu": cpu_limit, "memory": memory_limit},
-                requests={
-                    "cpu": cpu_limit,
-                    "memory": memory_limit,
-                },
-            ),
+            resources=resources,
             env=[
                 # this is provided in jupyter worker containers and we also use it
                 # for compatibility checks

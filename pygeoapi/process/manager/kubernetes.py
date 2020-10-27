@@ -62,7 +62,6 @@ class KubernetesProcessor(BaseProcessor):
         self,
         data: Dict,
         user_uuid: str,
-        retrieve_global_limits,
         s3_bucket_config: Optional[KubernetesProcessor.S3BucketConfig],
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         """
@@ -271,17 +270,9 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
-
-        def retrieve_global_limits():
-            limits = self.core_api.read_namespaced_resource_quota(
-                name=RESOURCE_QUOTA_NAME, namespace=self.namespace
-            ).spec.hard
-            return {k: limits[f"limits.{k}"] for k in ("cpu", "memory")}
-
         spec, result = p.create_job_pod_spec(
             data=data_dict,
             user_uuid=self.user_uuid,
-            retrieve_global_limits=retrieve_global_limits,
             s3_bucket_config=self._get_s3_bucket_config(),
         )
 
