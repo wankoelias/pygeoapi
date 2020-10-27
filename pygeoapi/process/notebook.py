@@ -134,14 +134,18 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
         resources = k8s_client.V1ResourceRequirements(
-            limits={
-                "cpu": data.get("cpu_limit"),
-                "memory": data.get("memory_limit"),
-            },
-            requests={
-                "cpu": data.get("cpu_requests"),
-                "memory": data.get("memory_requests"),
-            },
+            limits=drop_none_values(
+                {
+                    "cpu": data.get("cpu_limit"),
+                    "memory": data.get("mem_limit"),
+                }
+            ),
+            requests=drop_none_values(
+                {
+                    "cpu": data.get("cpu_requests"),
+                    "memory": data.get("mem_requests"),
+                }
+            ),
         )
 
         extra_containers, extra_volume_mounts, extra_volumes = [], [], []
@@ -186,7 +190,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                         ),
                     ],
                     resources=k8s_client.V1ResourceRequirements(
-                        limits={"cpu": "0.2", "memory": "128Mi"},
+                        limits={"cpu": "0.1", "memory": "128Mi"},
                         requests={
                             "cpu": "0.05",
                             "memory": "32Mi",
@@ -291,3 +295,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
     def __repr__(self):
         return "<PapermillNotebookKubernetesProcessor> {}".format(self.name)
+
+
+def drop_none_values(d: Dict) -> Dict:
+    return {k: v for k, v in d.items() if v is not None}
