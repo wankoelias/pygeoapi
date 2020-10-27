@@ -2109,6 +2109,8 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
 
         :returns: tuple of headers, status code, content
         """
+        format_ = check_format(args, headers)
+
         headers_ = HEADERS.copy()
 
         processes_config = filter_dict_by_key_value(self.config['resources'],
@@ -2130,7 +2132,6 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
             LOGGER.info(exception)
             return headers_, 404, to_json(exception, self.pretty_print)
 
-        format_ = check_format(args, headers_)
         if format_ is not None and format_ not in FORMATS:
             exception = {
                 'code': 'InvalidParameterValue',
@@ -2166,7 +2167,7 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
             # TODO link to exception report?
             pass
 
-        if format_ == 'json' or format_ == 'jsonld':
+        if format_ != 'html':
             return headers_, 200, json.dumps(response, default=json_serial)
         else:
             headers_['Content-Type'] = 'text/html'
@@ -2193,6 +2194,8 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
 
         :returns: tuple of headers, status code, content
         """
+        format_ = check_format(args, headers)
+
         headers_ = HEADERS.copy()
         processes_config = filter_dict_by_key_value(self.config['resources'],
                                                     'type', 'process')
@@ -2251,9 +2254,7 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
             LOGGER.info(exception)
             return headers_, http_status, json.dumps(exception)
 
-        format_ = check_format(args, headers_)
-
-        if not format_ or format_ == 'html':
+        if format_ == 'html':
             headers_['Content-Type'] = 'text/html'
             response = render_j2_template(self.config, 'jobresult.html', {
                 'process': {'id': process_id, 'title': process.metadata['title']},
