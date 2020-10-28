@@ -31,8 +31,9 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
-from pathlib import Path
+from pathlib import PurePath
 import os
+from pygeoapi.process.notebook import working_dir
 import re
 from typing import Dict, Tuple
 import urllib.parse
@@ -128,7 +129,7 @@ class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
         parameters = data["parameters"]
         job_name = "job-notebook"
 
-        home = Path("/home/jovyan")
+        home = PurePath("/home/jovyan")
 
         # TODO: from env
         home_subpath = f"users/{user_uuid}".replace("-", "-2d")
@@ -152,7 +153,7 @@ class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f'"{output_notebook}" '
                 f'-b "{parameters}" ',
             ],
-            working_dir=str(home),
+            working_dir=str(working_dir(PurePath(notebook_path))),
             volume_mounts=[
                 k8s_client.V1VolumeMount(
                     mount_path=str(home), name="home", sub_path=home_subpath
