@@ -847,7 +847,7 @@ def test_execute_process(config, api_):
     assert data['code'] == 'NoSuchProcess'
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers
@@ -856,21 +856,21 @@ def test_execute_process(config, api_):
     assert data['outputs'][0]['value'] == 'Hello Test!'
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_2), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_2), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers
     assert data['outputs'][0]['value'] == 'Hello Tést!'
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_3), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_3), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers
     assert data['outputs'][0]['value'] == 'Hello Tést! This is a test.'
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_4), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_4), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers
@@ -878,7 +878,7 @@ def test_execute_process(config, api_):
     # TODO inspect Location URI and asset 400 status
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_5), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_5), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers
@@ -886,7 +886,7 @@ def test_execute_process(config, api_):
     # TODO inspect Location URI and asset 400 status
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_6), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_6), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers
@@ -894,7 +894,7 @@ def test_execute_process(config, api_):
     assert data['description'] == 'Cannot process without a name'
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_7), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_7), 'hello-world')
     data = json.loads(response)
     assert code == 400
     assert 'Location' not in rsp_headers
@@ -902,7 +902,7 @@ def test_execute_process(config, api_):
     assert data['description'] == 'invalid request data'
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body_8), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body_8), 'hello-world')
     data = json.loads(response)
     assert code == 400
     assert 'Location' not in rsp_headers
@@ -910,7 +910,7 @@ def test_execute_process(config, api_):
     assert data['description'] == 'invalid request data'
     req_headers = make_req_headers()
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body), 'goodbye-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body), 'goodbye-world')
     response = json.loads(response)
     assert code == 404
     assert 'Location' not in rsp_headers
@@ -993,10 +993,10 @@ def test_check_async():
     args = {}
     req_headers = {}
 
-    assert check_async(args, req_headers) is False
+    assert check_async(args, req_headers) is True
 
     args['f'] = 'html'
-    assert check_async(args, req_headers) is False
+    assert check_async(args, req_headers) is True
 
     args['sync-execute'] = 'True'
     assert check_async(args, req_headers) is False
@@ -1038,7 +1038,7 @@ def test_delete_job(api_):
     }
 
     rsp_headers, code, response = api_.execute_process(
-        'POST', req_headers, {}, json.dumps(req_body), 'hello-world')
+        'POST', req_headers, {'sync-execute': 'True'}, json.dumps(req_body), 'hello-world')
     data = json.loads(response)
     assert code == 200
     assert 'Location' in rsp_headers

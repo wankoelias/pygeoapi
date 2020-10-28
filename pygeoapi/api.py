@@ -2427,7 +2427,7 @@ tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
 def check_async(args, headers):
     """
     Check execution mode requested from arguments or headers. Returns
-    True if asynchronous execution is requested, False otherwise.
+    False if synchronous execution is requested, True otherwise.
     Arguments take precedence over headers.
 
     The args and headers considered are labelled "sync-execute" and
@@ -2454,7 +2454,7 @@ def check_async(args, headers):
     async_header = headers.get('async-execute', None) == 'True'
     if async_header:
         return True
-    return False
+    return True
 
 def check_format(args, headers):
     """
