@@ -103,6 +103,9 @@ PROCESS_METADATA = {
 }
 
 
+CONTAINER_HOME = PurePath("/home/jovyan")
+
+
 class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
@@ -119,8 +122,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         notebook_path = data["notebook"]
         parameters = data["parameters"]
         job_name = "job-notebook"
-
-        home = PurePath("/home/jovyan")
 
         # TODO: allow override from parameter
         image = self.default_image
@@ -174,20 +175,13 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ),
         )
 
-        abs_notebook_path = (
-            PurePath(notebook_path)
-            if PurePath(notebook_path).is_absolute()
-            else (home / notebook_path)
-        )
-        working_dir = str(abs_notebook_path.parent)
-
         extra_containers, extra_volume_mounts, extra_volumes = [], [], []
 
         if s3_bucket_config:
             s3_user_bucket_volume_name = "s3-user-bucket"
             extra_volume_mounts.append(
                 k8s_client.V1VolumeMount(
-                    mount_path="/home/jovyan/s3",
+                    mount_path=f"{CONTAINER_HOME}/s3",
                     name=s3_user_bucket_volume_name,
                     mount_propagation="HostToContainer",
                 )
@@ -276,10 +270,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f'"{output_notebook}" '
                 f"-k {kernel} " + (f'-b "{parameters}" ' if parameters else ""),
             ],
-            working_dir=working_dir,
+            working_dir=str(working_dir(PurePath(notebook_path))),
             volume_mounts=[
                 k8s_client.V1VolumeMount(
-                    mount_path=str(home),
+                    mount_path=str(CONTAINER_HOME),
                     name="home",
                 ),
             ]
@@ -329,6 +323,15 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
     def __repr__(self):
         return "<PapermillNotebookKubernetesProcessor> {}".format(self.name)
+
+
+def working_dir(notebook_path: PurePath) -> PurePath:
+    abs_notebook_path = (
+        notebook_path
+        if notebook_path.is_absolute()
+        else (CONTAINER_HOME / notebook_path)
+    )
+    return abs_notebook_path.parent
 
 
 def drop_none_values(d: Dict) -> Dict:
