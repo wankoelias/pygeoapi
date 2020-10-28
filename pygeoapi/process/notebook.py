@@ -183,8 +183,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                         "sh",
                         "-c",
                         'echo "`date` waiting for job start"; '
-                        "while ! pgrep -x papermill > /dev/null; do sleep 1; done; "
-                        'echo "`date` job start detected"; '
+                        "sleep 5; "
+                        'echo "`date` job start assumed"; '
                         "while pgrep -x papermill > /dev/null; do sleep 1; done; "
                         'echo "`date` job end detected"; ',
                     ],
