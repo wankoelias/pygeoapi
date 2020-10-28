@@ -27,28 +27,66 @@
 #
 # =================================================================
 
+import pytest
 
 from pygeoapi.process.notebook import PapermillNotebookKubernetesProcessor
 
 
-def test_workdir_is_notebook_dir():
+def _create_processor(def_override=None) -> PapermillNotebookKubernetesProcessor:
+    return PapermillNotebookKubernetesProcessor(
+        processor_def={
+            "name": "test",
+            "s3_bucket_name": "example",
+            "default_image": "example",
+            **(def_override if def_override else {}),
+        }
+    )
 
-    processor_def = {
-        "name": "test",
-        "s3_bucket_name": "example",
-        "default_image": "example",
-    }
 
-    processor = PapermillNotebookKubernetesProcessor(processor_def=processor_def)
+@pytest.fixture()
+def papermill_processor() -> PapermillNotebookKubernetesProcessor:
+    return _create_processor()
 
+
+@pytest.fixture()
+def papermill_gpu_processor() -> PapermillNotebookKubernetesProcessor:
+    return _create_processor({"default_image": "jupyter-user-g:1.2.3"})
+
+
+def test_workdir_is_notebook_dir(papermill_processor):
     relative_dir = "a/b"
     nb_path = f"{relative_dir}/a.ipynb"
     abs_dir = f"/home/jovyan/{relative_dir}"
 
-    spec, _ = processor.create_job_pod_spec(
+    spec, _ = papermill_processor.create_job_pod_spec(
         data={"notebook": nb_path, "parameters": ""},
         user_uuid="",
         s3_bucket_config=None,
     )
 
     assert spec.containers[0].working_dir == abs_dir
+
+
+def test_default_image_has_no_affinity(papermill_processor):
+    spec, _ = papermill_processor.create_job_pod_spec(
+        data={"notebook": "a", "parameters": ""},
+        user_uuid="",
+        s3_bucket_config=None,
+    )
+
+    assert spec.affinity is None
+    assert spec.tolerations is None
+
+
+def test_gpu_image_has_affinity(papermill_gpu_processor):
+    spec, _ = papermill_gpu_processor.create_job_pod_spec(
+        data={"notebook": "a", "parameters": ""},
+        user_uuid="",
+        s3_bucket_config=None,
+    )
+
+    sel = (
+        spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution
+    )
+    assert sel.node_selector_terms[0].match_expressions[0].values == ["g2"]
+    assert spec.tolerations[0].key == "hub.eox.at/gpu"
