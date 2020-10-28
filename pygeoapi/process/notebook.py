@@ -134,31 +134,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
-        extra_podspec = {}
-        if is_gpu:
-            node_selector = k8s_client.V1NodeSelector(
-                node_selector_terms=[
-                    k8s_client.V1NodeSelectorTerm(
-                        match_expressions=[
-                            k8s_client.V1NodeSelectorRequirement(
-                                key="hub.eox.at/node-purpose",
-                                operator="In",
-                                values=["g2"],
-                            ),
-                        ]
-                    )
-                ]
-            )
-            extra_podspec["affinity"] = k8s_client.V1Affinity(
-                node_affinity=k8s_client.V1NodeAffinity(
-                    required_during_scheduling_ignored_during_execution=node_selector
-                )
-            )
-            extra_podspec["tolerations"] = [
-                k8s_client.V1Toleration(
-                    key="hub.eox.at/gpu", operator="Exists", effect="NoSchedule"
-                )
-            ]
+        extra_podspec = gpu_extra_podspec() if is_gpu else {}
 
         resources = k8s_client.V1ResourceRequirements(
             limits=drop_none_values(
@@ -332,6 +308,34 @@ def working_dir(notebook_path: PurePath) -> PurePath:
         else (CONTAINER_HOME / notebook_path)
     )
     return abs_notebook_path.parent
+
+
+def gpu_extra_podspec() -> Dict:
+    node_selector = k8s_client.V1NodeSelector(
+        node_selector_terms=[
+            k8s_client.V1NodeSelectorTerm(
+                match_expressions=[
+                    k8s_client.V1NodeSelectorRequirement(
+                        key="hub.eox.at/node-purpose",
+                        operator="In",
+                        values=["g2"],
+                    ),
+                ]
+            )
+        ]
+    )
+    return {
+        "affinity": k8s_client.V1Affinity(
+            node_affinity=k8s_client.V1NodeAffinity(
+                required_during_scheduling_ignored_during_execution=node_selector
+            )
+        ),
+        "tolerations": [
+            k8s_client.V1Toleration(
+                key="hub.eox.at/gpu", operator="Exists", effect="NoSchedule"
+            )
+        ],
+    }
 
 
 def drop_none_values(d: Dict) -> Dict:
