@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
-from pathlib import Path
+from pathlib import PurePath
 import re
 from typing import Dict, Optional, Tuple
 import urllib.parse
@@ -120,7 +120,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         parameters = data["parameters"]
         job_name = "job-notebook"
 
-        home = Path("/home/jovyan")
+        home = PurePath("/home/jovyan")
 
         # TODO: allow override from parameter
         image = self.default_image
@@ -147,6 +147,13 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 }
             ),
         )
+
+        abs_notebook_path = (
+            PurePath(notebook_path)
+            if PurePath(notebook_path).is_absolute()
+            else (home / notebook_path)
+        )
+        working_dir = str(abs_notebook_path.parent)
 
         extra_containers, extra_volume_mounts, extra_volumes = [], [], []
 
@@ -243,7 +250,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f'"{output_notebook}" '
                 f"-k {kernel} " + (f'-b "{parameters}" ' if parameters else ""),
             ],
-            working_dir=str(home),
+            working_dir=working_dir,
             volume_mounts=[
                 k8s_client.V1VolumeMount(
                     mount_path=str(home),
