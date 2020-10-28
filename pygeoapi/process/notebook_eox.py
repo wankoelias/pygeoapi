@@ -150,8 +150,7 @@ class EOXPapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 "--request-save-on-cell-execute "
                 "--autosave-cell-every 60 "
                 f'"{notebook_path}" '
-                f'"{output_notebook}" '
-                f'-b "{parameters}" ',
+                f'"{output_notebook}" ' + (f'-b "{parameters}" ' if parameters else ""),
             ],
             working_dir=str(working_dir(PurePath(notebook_path))),
             volume_mounts=[
