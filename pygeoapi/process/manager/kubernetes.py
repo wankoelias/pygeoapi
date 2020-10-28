@@ -374,7 +374,8 @@ def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
     }
 
     status = job_status_from_k8s(job.status)
-    completion_time = job.status.completion_time
+    completion_time = get_completion_time(job, status)
+
     computed_metadata = {
         # NOTE: this is passed as string as compatibility with base manager
         "status": status.value,
@@ -393,6 +394,21 @@ def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
         **metadata_from_annotation,
         **computed_metadata,
     }
+
+
+def get_completion_time(job: k8s_client.V1Job, status: JobStatus) -> Optional[datetime]:
+    if status == JobStatus.failed:
+        # failed jobs have special completion time field
+        return max(
+            (
+                condition.last_transition_time
+                for condition in job.status.conditions
+                if condition.type == "Failed" and condition.status == "True"
+            ),
+            default=None,
+        )
+
+    return job.status.completion_time
 
 
 def current_namespace():
