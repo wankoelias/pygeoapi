@@ -28,7 +28,9 @@
 # =================================================================
 
 import pytest
+from typing import Dict
 
+from pygeoapi.process.manager.kubernetes import KubernetesProcessor
 from pygeoapi.process.notebook import PapermillNotebookKubernetesProcessor
 
 
@@ -53,7 +55,16 @@ def papermill_gpu_processor() -> PapermillNotebookKubernetesProcessor:
     return _create_processor({"default_image": "jupyter-user-g:1.2.3"})
 
 
-def test_workdir_is_notebook_dir(papermill_processor):
+@pytest.fixture()
+def create_pod_kwargs() -> Dict:
+    return {
+        "data": {"notebook": "a", "parameters": ""},
+        "user_uuid": "",
+        "s3_bucket_config": None,
+    }
+
+
+def test_workdir_is_notebook_dir(papermill_processor, create_pod_kwargs):
     relative_dir = "a/b"
     nb_path = f"{relative_dir}/a.ipynb"
     abs_dir = f"/home/jovyan/{relative_dir}"
@@ -67,26 +78,34 @@ def test_workdir_is_notebook_dir(papermill_processor):
     assert spec.containers[0].working_dir == abs_dir
 
 
-def test_default_image_has_no_affinity(papermill_processor):
-    spec, _ = papermill_processor.create_job_pod_spec(
-        data={"notebook": "a", "parameters": ""},
-        user_uuid="",
-        s3_bucket_config=None,
-    )
+def test_default_image_has_no_affinity(papermill_processor, create_pod_kwargs):
+    spec, _ = papermill_processor.create_job_pod_spec(**create_pod_kwargs)
 
     assert spec.affinity is None
     assert spec.tolerations is None
 
 
-def test_gpu_image_has_affinity(papermill_gpu_processor):
-    spec, _ = papermill_gpu_processor.create_job_pod_spec(
+def test_gpu_image_has_affinity(papermill_gpu_processor, create_pod_kwargs):
+    spec, _ = papermill_gpu_processor.create_job_pod_spec(**create_pod_kwargs)
+
+    r = spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution
+    assert r.node_selector_terms[0].match_expressions[0].values == ["g2"]
+    assert spec.tolerations[0].key == "hub.eox.at/gpu"
+
+
+def test_no_s3_bucket_by_default(papermill_processor, create_pod_kwargs):
+    spec, _ = papermill_processor.create_job_pod_spec(**create_pod_kwargs)
+    assert "s3mounter" not in [c.name for c in spec.containers]
+    assert "/home/jovyan/s3" not in [
+        m.mount_path for m in spec.containers[0].volume_mounts
+    ]
+
+
+def test_s3_bucket_present_when_requested(papermill_processor):
+    spec, _ = papermill_processor.create_job_pod_spec(
         data={"notebook": "a", "parameters": ""},
         user_uuid="",
-        s3_bucket_config=None,
+        s3_bucket_config=KubernetesProcessor.S3BucketConfig(secret_name="a"),
     )
-
-    sel = (
-        spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution
-    )
-    assert sel.node_selector_terms[0].match_expressions[0].values == ["g2"]
-    assert spec.tolerations[0].key == "hub.eox.at/gpu"
+    assert "s3mounter" in [c.name for c in spec.containers]
+    assert "/home/jovyan/s3" in [m.mount_path for m in spec.containers[0].volume_mounts]
