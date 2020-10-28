@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+from base64 import b64decode
 from datetime import datetime
 from http import HTTPStatus
 import logging
@@ -276,9 +277,13 @@ class KubernetesManager(BaseManager):
             s3_bucket_config=self._get_s3_bucket_config(),
         )
 
+        # save parameters but make sure the string is not too long
+        parameters = b64decode(data_dict.get("parameters", "")).decode()[:8000]
+
         annotations = {
             "identifier": job_id,
             "process_start_datetime": datetime.utcnow().strftime(DATETIME_FORMAT),
+            "parameters": parameters,
         }
         if result["result_type"] == "link":
             annotations["result_link"] = result["link"]
