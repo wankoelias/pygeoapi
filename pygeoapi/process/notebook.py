@@ -133,6 +133,32 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
+        extra_podspec = {}
+        if is_gpu:
+            node_selector = k8s_client.V1NodeSelector(
+                node_selector_terms=[
+                    k8s_client.V1NodeSelectorTerm(
+                        match_expressions=[
+                            k8s_client.V1NodeSelectorRequirement(
+                                key="hub.eox.at/node-purpose",
+                                operator="In",
+                                values=["g2"],
+                            ),
+                        ]
+                    )
+                ]
+            )
+            extra_podspec["affinity"] = k8s_client.V1Affinity(
+                node_affinity=k8s_client.V1NodeAffinity(
+                    required_during_scheduling_ignored_during_execution=node_selector
+                )
+            )
+            extra_podspec["tolerations"] = [
+                k8s_client.V1Toleration(
+                    key="hub.eox.at/gpu", operator="Exists", effect="NoSchedule"
+                )
+            ]
+
         resources = k8s_client.V1ResourceRequirements(
             limits=drop_none_values(
                 {
@@ -283,6 +309,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 # we need this to be able to terminate the sidecar container
                 # https://github.com/kubernetes/kubernetes/issues/25908
                 share_process_namespace=True,
+                **extra_podspec,
             ),
             {
                 "result_type": "link",
