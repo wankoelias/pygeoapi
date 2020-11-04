@@ -166,8 +166,15 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             image=image,
             command=[
                 "bash",
+                # NOTE: we pretend that the shell is interactive such that it
+                #       sources /etc/bash.bashrc which activates the default conda
+                #       env. This is ok because the default interactive shell must
+                #       have PATH set up to include papermill since regular user
+                #       should also be able to execute default env commands without extra
+                #       setup
+                "-i",
                 "-c",
-                f"/opt/conda/envs/*/bin/papermill "
+                f"papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
                 f'--cwd "{working_dir(PurePath(notebook_path))}" '
