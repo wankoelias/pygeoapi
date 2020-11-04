@@ -29,9 +29,11 @@
 
 from __future__ import annotations
 
+from base64 import b64encode
 from dataclasses import dataclass, field
 from datetime import datetime
 import functools
+import json
 import logging
 import operator
 from pathlib import PurePath
@@ -141,8 +143,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     ) -> Tuple[k8s_client.V1PodSpec, Dict]:
         LOGGER.debug("Starting job with data %s", data)
         notebook_path = data["notebook"]
-        parameters = data["parameters"]
-        job_name = "job-notebook"
+        parameters = data.get("parameters")
+        if not parameters:
+            if (parameters_json := data.get("parameters_json")) :
+                parameters = b64encode(json.dumps(parameters_json).encode()).decode()
 
         # TODO: allow override from parameter
         image = self.default_image
@@ -198,7 +202,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         extra_config = functools.reduce(operator.add, extra_configs())
 
         notebook_container = k8s_client.V1Container(
-            name=job_name,
+            name="notebook",
             image=image,
             command=[
                 "bash",

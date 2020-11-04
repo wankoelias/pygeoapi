@@ -27,6 +27,9 @@
 #
 # =================================================================
 
+from base64 import b64encode
+import copy
+import json
 import pytest
 from typing import Dict
 
@@ -80,6 +83,15 @@ def test_workdir_is_notebook_dir(papermill_processor):
     )
 
     assert f'--cwd "{abs_dir}"' in str(spec.containers[0].command)
+
+
+def test_json_params_are_b64_encoded(papermill_processor, create_pod_kwargs):
+    payload = {"a": 3}
+    create_pod_kwargs = copy.deepcopy(create_pod_kwargs)
+    create_pod_kwargs['data']['parameters_json'] = payload
+    spec, _ =  papermill_processor.create_job_pod_spec(**create_pod_kwargs)
+
+    assert b64encode(json.dumps(payload).encode()).decode() in str(spec.containers[0].command)
 
 
 def test_gpu_image_produces_gpu_kernel(papermill_gpu_processor, create_pod_kwargs):

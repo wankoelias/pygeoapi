@@ -93,8 +93,6 @@ class KubernetesManager(BaseManager):
 
         # TODO: remove user_uuid and jobs_in_user_namespace.
         #       in the current config, current_namespace() is always used
-        #       user_uuid then would only be used for notebook_eox, where we can
-        #       use a different setting
         self.user_uuid = manager_def["user_uuid"]
         self.namespace = (
             self.user_uuid
