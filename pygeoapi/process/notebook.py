@@ -160,10 +160,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         notebook_dir = working_dir(PurePath(notebook_path))
 
-        output_notebook = data.get("output_path", default_output_path(notebook_path))
-
-        if not PurePath(output_notebook).is_absolute():
-            output_notebook = str(notebook_dir / output_notebook)
+        if (output_notebook := data.get("output_path")):
+            if not PurePath(output_notebook).is_absolute():
+                output_notebook = str(notebook_dir / output_notebook)
+        else:
+            output_notebook = default_output_path(notebook_path)
 
         extra_podspec = gpu_extra_podspec() if is_gpu else {}
 
