@@ -110,6 +110,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
     def __init__(self, processor_def):
         super().__init__(processor_def, PROCESS_METADATA)
         self.default_image = processor_def["default_image"]
+        self.image_pull_secret = processor_def["image_pull_secret"]
         self.s3_bucket_name = processor_def["s3_bucket_name"]
         self.home_volume_claim_name = processor_def["home_volume_claim_name"]
         self.extra_pvcs = processor_def["extra_pvcs"]
@@ -137,6 +138,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
         extra_podspec = gpu_extra_podspec() if is_gpu else {}
+
+        if self.image_pull_secret:
+            extra_podspec["image_pull_secrets"] = [
+                k8s_client.V1LocalObjectReference(name=self.image_pull_secret)
+            ]
 
         resources = k8s_client.V1ResourceRequirements(
             limits=drop_none_values(

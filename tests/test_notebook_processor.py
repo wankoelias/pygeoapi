@@ -42,6 +42,7 @@ def _create_processor(def_override=None) -> PapermillNotebookKubernetesProcessor
             "default_image": "example",
             "extra_pvcs": [],
             "home_volume_claim_name": "user",
+            "image_pull_secret": "",
             **(def_override if def_override else {}),
         }
     )
@@ -121,3 +122,9 @@ def test_extra_pvcs_are_added_on_request(papermill_processor, create_pod_kwargs)
     spec, _ = processor.create_job_pod_spec(**create_pod_kwargs)
 
     assert claim_name in [v.persistent_volume_claim.claim_name for v in spec.volumes]
+
+
+def test_image_pull_secr_added_when_requested(papermill_processor, create_pod_kwargs):
+    processor = _create_processor({"image_pull_secret": "psrcr"})
+    spec, _ = processor.create_job_pod_spec(**create_pod_kwargs)
+    assert spec.image_pull_secrets[0].name == 'psrcr'
