@@ -114,6 +114,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         self.s3_bucket_name = processor_def["s3_bucket_name"]
         self.home_volume_claim_name = processor_def["home_volume_claim_name"]
         self.extra_pvcs = processor_def["extra_pvcs"]
+        self.jupyer_base_url = processor_def["jupyter_base_url"]
 
     def create_job_pod_spec(
         self,
@@ -256,7 +257,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     #   it doesn't say when it was fixed exactly. there's a possibly
                     #   related fix from last year:
                     # https://github.com/jupyterlab/jupyterlab/pull/6773
-                    "https://edc-jupyter.hub.eox.at/hub/user-redirect/lab/tree/"
+                    f"{self.jupyer_base_url}/hub/user-redirect/lab/tree/"
                     + urllib.parse.quote(output_notebook)
                 ),
             },

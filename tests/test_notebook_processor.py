@@ -43,6 +43,7 @@ def _create_processor(def_override=None) -> PapermillNotebookKubernetesProcessor
             "extra_pvcs": [],
             "home_volume_claim_name": "user",
             "image_pull_secret": "",
+            "jupyter_base_url": "",
             **(def_override if def_override else {}),
         }
     )
