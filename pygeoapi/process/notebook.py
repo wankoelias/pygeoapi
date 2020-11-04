@@ -158,9 +158,12 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         }.get(image.split(":")[0])
         is_gpu = kernel == "edc-gpu"
 
-        filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
-        now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-        output_notebook = filename_without_postfix + f"_result_{now_formatted}.ipynb"
+        notebook_dir = working_dir(PurePath(notebook_path))
+
+        output_notebook = data.get("output_path", default_output_path(notebook_path))
+
+        if not PurePath(output_notebook).is_absolute():
+            output_notebook = str(notebook_dir / output_notebook)
 
         extra_podspec = gpu_extra_podspec() if is_gpu else {}
 
@@ -200,7 +203,6 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 )
 
         extra_config = functools.reduce(operator.add, extra_configs())
-
         notebook_container = k8s_client.V1Container(
             name="notebook",
             image=image,
@@ -217,7 +219,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f"papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
-                f'--cwd "{working_dir(PurePath(notebook_path))}" '
+                f'--cwd "{notebook_dir}" '
                 + (f"-k {kernel} " if kernel else "")
                 + (f'-b "{parameters}" ' if parameters else ""),
             ],
@@ -259,6 +261,12 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
     def __repr__(self):
         return "<PapermillNotebookKubernetesProcessor> {}".format(self.name)
+
+
+def default_output_path(notebook_path: str) -> str:
+    filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
+    now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    return filename_without_postfix + f"_result_{now_formatted}.ipynb"
 
 
 def working_dir(notebook_path: PurePath) -> PurePath:

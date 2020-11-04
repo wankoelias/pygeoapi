@@ -88,10 +88,21 @@ def test_workdir_is_notebook_dir(papermill_processor):
 def test_json_params_are_b64_encoded(papermill_processor, create_pod_kwargs):
     payload = {"a": 3}
     create_pod_kwargs = copy.deepcopy(create_pod_kwargs)
-    create_pod_kwargs['data']['parameters_json'] = payload
-    spec, _ =  papermill_processor.create_job_pod_spec(**create_pod_kwargs)
+    create_pod_kwargs["data"]["parameters_json"] = payload
+    spec, _ = papermill_processor.create_job_pod_spec(**create_pod_kwargs)
 
-    assert b64encode(json.dumps(payload).encode()).decode() in str(spec.containers[0].command)
+    assert b64encode(json.dumps(payload).encode()).decode() in str(
+        spec.containers[0].command
+    )
+
+
+def test_custom_output_file_overwrites_default(papermill_processor, create_pod_kwargs):
+    output_path = "foo/bar.ipynb"
+    create_pod_kwargs = copy.deepcopy(create_pod_kwargs)
+    create_pod_kwargs["data"]["output_path"] = output_path
+    spec, _ = papermill_processor.create_job_pod_spec(**create_pod_kwargs)
+
+    assert output_path in str(spec.containers[0].command)
 
 
 def test_gpu_image_produces_gpu_kernel(papermill_gpu_processor, create_pod_kwargs):
