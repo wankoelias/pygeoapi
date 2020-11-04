@@ -128,4 +128,4 @@ def test_extra_pvcs_are_added_on_request(papermill_processor, create_pod_kwargs)
 def test_image_pull_secr_added_when_requested(papermill_processor, create_pod_kwargs):
     processor = _create_processor({"image_pull_secret": "psrcr"})
     spec, _ = processor.create_job_pod_spec(**create_pod_kwargs)
-    assert spec.image_pull_secrets[0].name == 'psrcr'
+    assert spec.image_pull_secrets[0].name == "psrcr"
