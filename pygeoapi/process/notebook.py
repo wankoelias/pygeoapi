@@ -170,9 +170,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f"/opt/conda/envs/*/bin/papermill "
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
+                f'--cwd "{working_dir(PurePath(notebook_path))}" '
                 f"-k {kernel} " + (f'-b "{parameters}" ' if parameters else ""),
             ],
-            working_dir=str(working_dir(PurePath(notebook_path))),
+            working_dir=str(CONTAINER_HOME),
             volume_mounts=[
                 k8s_client.V1VolumeMount(
                     mount_path=str(CONTAINER_HOME),
