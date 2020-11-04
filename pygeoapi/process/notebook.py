@@ -33,7 +33,7 @@ from datetime import datetime
 import logging
 from pathlib import PurePath
 import re
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 import urllib.parse
 
 from kubernetes import client as k8s_client
@@ -111,6 +111,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         super().__init__(processor_def, PROCESS_METADATA)
         self.default_image = processor_def["default_image"]
         self.s3_bucket_name = processor_def["s3_bucket_name"]
+        self.home_volume_claim_name = processor_def["home_volume_claim_name"]
+        self.extra_pvcs = processor_def["extra_pvcs"]
 
     def create_job_pod_spec(
         self,
@@ -151,14 +153,50 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ),
         )
 
-        extra_containers, extra_volume_mounts, extra_volumes = [], [], []
+        extra_containers: List[k8s_client.V1Container] = []
+        volume_mounts: List[k8s_client.V1VolumeMount] = []
+        volumes: List[k8s_client.V1Volume] = []
+
+        if self.home_volume_claim_name:
+            volumes.append(
+                k8s_client.V1Volume(
+                    persistent_volume_claim=k8s_client.V1PersistentVolumeClaimVolumeSource(
+                        claim_name=self.home_volume_claim_name,
+                    ),
+                    name="home",
+                )
+            )
+            volume_mounts.append(
+                k8s_client.V1VolumeMount(
+                    mount_path=str(CONTAINER_HOME),
+                    name="home",
+                )
+            )
+
+        for extra_pvc_num, extra_pvc in enumerate(self.extra_pvcs):
+            extra_name = f"extra-{extra_pvc_num}"
+            volumes.append(
+                k8s_client.V1Volume(
+                    persistent_volume_claim=k8s_client.V1PersistentVolumeClaimVolumeSource(
+                        claim_name=extra_pvc["claim_name"],
+                    ),
+                    name=extra_name,
+                )
+            )
+            volume_mounts.append(
+                k8s_client.V1VolumeMount(
+                    mount_path=extra_pvc["mount_path"],
+                    name=extra_name,
+                )
+            )
+
         if s3_bucket_config:
             append_s3_config(
                 s3_bucket_config=s3_bucket_config,
                 s3_bucket_name=self.s3_bucket_name,
                 extra_containers=extra_containers,
-                extra_volume_mounts=extra_volume_mounts,
-                extra_volumes=extra_volumes,
+                extra_volume_mounts=volume_mounts,
+                extra_volumes=volumes,
             )
 
         notebook_container = k8s_client.V1Container(
@@ -181,13 +219,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f"-k {kernel} " + (f'-b "{parameters}" ' if parameters else ""),
             ],
             working_dir=str(CONTAINER_HOME),
-            volume_mounts=[
-                k8s_client.V1VolumeMount(
-                    mount_path=str(CONTAINER_HOME),
-                    name="home",
-                ),
-            ]
-            + extra_volume_mounts,
+            volume_mounts=volume_mounts,
             resources=resources,
             env=[
                 # this is provided in jupyter worker containers and we also use it
@@ -196,14 +228,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ],
         )
 
-        volumes = [
-            k8s_client.V1Volume(
-                persistent_volume_claim=k8s_client.V1PersistentVolumeClaimVolumeSource(
-                    claim_name="user"
-                ),
-                name="home",
-            ),
-        ] + extra_volumes
+        volumes = volumes
 
         return (
             k8s_client.V1PodSpec(

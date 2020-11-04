@@ -40,6 +40,8 @@ def _create_processor(def_override=None) -> PapermillNotebookKubernetesProcessor
             "name": "test",
             "s3_bucket_name": "example",
             "default_image": "example",
+            "extra_pvcs": [],
+            "home_volume_claim_name": "user",
             **(def_override if def_override else {}),
         }
     )
@@ -75,7 +77,7 @@ def test_workdir_is_notebook_dir(papermill_processor, create_pod_kwargs):
         s3_bucket_config=None,
     )
 
-    assert spec.containers[0].working_dir == abs_dir
+    assert f'--cwd "{abs_dir}"' in str(spec.containers[0].command)
 
 
 def test_default_image_has_no_affinity(papermill_processor, create_pod_kwargs):
@@ -109,3 +111,13 @@ def test_s3_bucket_present_when_requested(papermill_processor):
     )
     assert "s3mounter" in [c.name for c in spec.containers]
     assert "/home/jovyan/s3" in [m.mount_path for m in spec.containers[0].volume_mounts]
+
+
+def test_extra_pvcs_are_added_on_request(papermill_processor, create_pod_kwargs):
+    claim_name = "my_pvc"
+    processor = _create_processor(
+        {"extra_pvcs": [{"claim_name": claim_name, "mount_path": "/mnt"}]}
+    )
+    spec, _ = processor.create_job_pod_spec(**create_pod_kwargs)
+
+    assert claim_name in [v.persistent_volume_claim.claim_name for v in spec.volumes]
