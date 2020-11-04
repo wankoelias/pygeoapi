@@ -148,8 +148,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         image = self.default_image
 
         # be a bit smart to select kernel (this should do for now)
-        is_gpu = image.split(":")[0].endswith("-g")
-        kernel = "edc-gpu" if is_gpu else "edc"
+        kernel = {
+            "eurodatacube/jupyter-user": "edc",
+            "eurodatacube/jupyter-user-g": "edc-gpu",
+        }.get(image.split(":")[0])
+        is_gpu = kernel == "edc-gpu"
 
         filename_without_postfix = re.sub(".ipynb$", "", notebook_path)
         now_formatted = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
@@ -211,7 +214,8 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 f'"{notebook_path}" '
                 f'"{output_notebook}" '
                 f'--cwd "{working_dir(PurePath(notebook_path))}" '
-                f"-k {kernel} " + (f'-b "{parameters}" ' if parameters else ""),
+                + (f"-k {kernel} " if kernel else "")
+                + (f'-b "{parameters}" ' if parameters else ""),
             ],
             working_dir=str(CONTAINER_HOME),
             volume_mounts=extra_config.volume_mounts,

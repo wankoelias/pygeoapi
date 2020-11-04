@@ -56,7 +56,7 @@ def papermill_processor() -> PapermillNotebookKubernetesProcessor:
 
 @pytest.fixture()
 def papermill_gpu_processor() -> PapermillNotebookKubernetesProcessor:
-    return _create_processor({"default_image": "jupyter-user-g:1.2.3"})
+    return _create_processor({"default_image": "eurodatacube/jupyter-user-g:1.2.3"})
 
 
 @pytest.fixture()
@@ -68,7 +68,7 @@ def create_pod_kwargs() -> Dict:
     }
 
 
-def test_workdir_is_notebook_dir(papermill_processor, create_pod_kwargs):
+def test_workdir_is_notebook_dir(papermill_processor):
     relative_dir = "a/b"
     nb_path = f"{relative_dir}/a.ipynb"
     abs_dir = f"/home/jovyan/{relative_dir}"
@@ -80,6 +80,11 @@ def test_workdir_is_notebook_dir(papermill_processor, create_pod_kwargs):
     )
 
     assert f'--cwd "{abs_dir}"' in str(spec.containers[0].command)
+
+
+def test_gpu_image_produces_gpu_kernel(papermill_gpu_processor, create_pod_kwargs):
+    spec, _ = papermill_gpu_processor.create_job_pod_spec(**create_pod_kwargs)
+    assert "-k edc-gpu" in str(spec.containers[0].command)
 
 
 def test_default_image_has_no_affinity(papermill_processor, create_pod_kwargs):
