@@ -29,7 +29,6 @@
 
 from __future__ import annotations
 
-from base64 import b64decode
 from datetime import datetime
 from http import HTTPStatus
 import logging
@@ -59,12 +58,18 @@ class KubernetesProcessor(BaseProcessor):
     class S3BucketConfig:
         secret_name: str
 
+    @dataclass(frozen=True)
+    class JobPodSpec:
+        pod_spec: k8s_client.V1PodSpec
+        result: Dict
+        extra_annotations: Dict
+
     def create_job_pod_spec(
         self,
         data: Dict,
         user_uuid: str,
         s3_bucket_config: Optional[KubernetesProcessor.S3BucketConfig],
-    ) -> Tuple[k8s_client.V1PodSpec, Dict]:
+    ) -> JobPodSpec:
         """
         Returns a definition of a job as well as result handling.
         Currently the only supported way for handling result is for the processor
@@ -272,24 +277,21 @@ class KubernetesManager(BaseManager):
         :returns: tuple of None (i.e. initial response payload)
                   and JobStatus.accepted (i.e. initial job status)
         """
-        spec, result = p.create_job_pod_spec(
+        job_pod_spec = p.create_job_pod_spec(
             data=data_dict,
             user_uuid=self.user_uuid,
             s3_bucket_config=self._get_s3_bucket_config(),
         )
 
-        # save parameters but make sure the string is not too long
-        parameters = b64decode(data_dict.get("parameters", "")).decode()[:8000]
-
         annotations = {
             "identifier": job_id,
             "process_start_datetime": datetime.utcnow().strftime(DATETIME_FORMAT),
-            "parameters": parameters,
+            **job_pod_spec.extra_annotations,
         }
-        if result["result_type"] == "link":
-            annotations["result_link"] = result["link"]
+        if job_pod_spec.result["result_type"] == "link":
+            annotations["result_link"] = job_pod_spec.result["link"]
         else:
-            raise Exception("invalid result type %s", result)
+            raise Exception("invalid result type %s", job_pod_spec.result)
 
         job = k8s_client.V1Job(
             api_version="batch/v1",
@@ -301,7 +303,7 @@ class KubernetesManager(BaseManager):
                 },
             ),
             spec=k8s_client.V1JobSpec(
-                template=k8s_client.V1PodTemplateSpec(spec=spec),
+                template=k8s_client.V1PodTemplateSpec(spec=job_pod_spec.pod_spec),
                 backoff_limit=0,
                 ttl_seconds_after_finished=60 * 60 * 24 * 7,
             ),

@@ -29,7 +29,7 @@
 
 from __future__ import annotations
 
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from dataclasses import dataclass, field
 from datetime import datetime
 import functools
@@ -38,7 +38,7 @@ import logging
 import operator
 from pathlib import PurePath
 import re
-from typing import Dict, Iterable, Optional, Tuple, List
+from typing import Dict, Iterable, Optional, List
 import urllib.parse
 
 from kubernetes import client as k8s_client
@@ -140,10 +140,10 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         data: Dict,
         user_uuid: str,
         s3_bucket_config: Optional[KubernetesProcessor.S3BucketConfig],
-    ) -> Tuple[k8s_client.V1PodSpec, Dict]:
+    ) -> KubernetesProcessor.JobPodSpec:
         LOGGER.debug("Starting job with data %s", data)
         notebook_path = data["notebook"]
-        parameters = data.get("parameters")
+        parameters = data.get("parameters", "")
         if not parameters:
             if (parameters_json := data.get("parameters_json")) :
                 parameters = b64encode(json.dumps(parameters_json).encode()).decode()
@@ -160,7 +160,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
 
         notebook_dir = working_dir(PurePath(notebook_path))
 
-        if (output_notebook := data.get("output_path")):
+        if (output_notebook := data.get("output_path")) :
             if not PurePath(output_notebook).is_absolute():
                 output_notebook = str(notebook_dir / output_notebook)
         else:
@@ -234,8 +234,11 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
             ],
         )
 
-        return (
-            k8s_client.V1PodSpec(
+        # save parameters but make sure the string is not too long
+        extra_annotations = {"parameters": b64decode(parameters).decode()[:8000]}
+
+        return KubernetesProcessor.JobPodSpec(
+            pod_spec=k8s_client.V1PodSpec(
                 restart_policy="Never",
                 # NOTE: first container is used for status check
                 containers=[notebook_container] + extra_config.containers,
@@ -245,7 +248,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                 share_process_namespace=True,
                 **extra_podspec,
             ),
-            {
+            result={
                 "result_type": "link",
                 "link": (
                     # NOTE: this link currently doesn't work (even those created in
@@ -259,6 +262,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
                     + urllib.parse.quote(output_notebook)
                 ),
             },
+            extra_annotations=extra_annotations,
         )
 
     def __repr__(self):
