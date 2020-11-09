@@ -143,7 +143,7 @@ def test_s3_bucket_present_when_requested(papermill_processor):
     assert "/home/jovyan/s3" in [m.mount_path for m in spec.containers[0].volume_mounts]
 
 
-def test_extra_pvcs_are_added_on_request(papermill_processor, create_pod_kwargs):
+def test_extra_pvcs_are_added_on_request(create_pod_kwargs):
     claim_name = "my_pvc"
     processor = _create_processor(
         {"extra_pvcs": [{"claim_name": claim_name, "mount_path": "/mnt"}]}
@@ -153,7 +153,7 @@ def test_extra_pvcs_are_added_on_request(papermill_processor, create_pod_kwargs)
     assert claim_name in [v.persistent_volume_claim.claim_name for v in spec.volumes]
 
 
-def test_image_pull_secr_added_when_requested(papermill_processor, create_pod_kwargs):
+def test_image_pull_secr_added_when_requested(create_pod_kwargs):
     processor = _create_processor({"image_pull_secret": "psrcr"})
     spec, _ = processor.create_job_pod_spec(**create_pod_kwargs)
     assert spec.image_pull_secrets[0].name == "psrcr"

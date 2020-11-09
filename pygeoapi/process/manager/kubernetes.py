@@ -117,7 +117,7 @@ class KubernetesManager(BaseManager):
         # TODO: implement status filter
 
         return [
-            job_from_k8s(k8s_job)
+            job_from_k8s(k8s_job, self._job_message(k8s_job))
             for k8s_job in k8s_jobs.items
             if is_k8s_job_name(k8s_job.metadata.name)
         ]
@@ -132,12 +132,11 @@ class KubernetesManager(BaseManager):
         :returns: `dict`  # `pygeoapi.process.manager.Job`
         """
         try:
-            return job_from_k8s(
-                self.batch_v1.read_namespaced_job(
-                    name=k8s_job_name(job_id=jobid),
-                    namespace=self.namespace,
-                )
+            k8s_job: k8s_client.V1Job = self.batch_v1.read_namespaced_job(
+                name=k8s_job_name(job_id=jobid),
+                namespace=self.namespace,
             )
+            return job_from_k8s(k8s_job, self._job_message(k8s_job))
         except kubernetes.client.rest.ApiException as e:
             if e.status == HTTPStatus.NOT_FOUND:
                 return None
@@ -328,6 +327,25 @@ class KubernetesManager(BaseManager):
                 secret_name=S3_BUCKET_SECRET_NAME,
             )
 
+    def _job_message(self, job: k8s_client.V1Job) -> Optional[str]:
+        label_selector = ",".join(
+            f"{key}={value}" for key, value in job.spec.selector.match_labels.items()
+        )
+        pods = self.core_api.list_namespaced_pod(
+            namespace=self.namespace, label_selector=label_selector
+        )
+        if pods.items:
+            pod = pods.items[0]
+            state: k8s_client.V1ContainerState = pod.status.container_statuses[0].state
+            interesting_states = [s for s in (state.waiting, state.terminated) if s]
+            if interesting_states:
+                return ": ".join(
+                    filter(
+                        None,
+                        (interesting_states[0].reason, interesting_states[0].message),
+                    )
+                )
+
 
 _ANNOTATIONS_PREFIX = "pygeoapi_"
 
@@ -366,7 +384,7 @@ def job_status_from_k8s(status: k8s_client.V1JobStatus) -> JobStatus:
         return JobStatus.accepted
 
 
-def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
+def job_from_k8s(job: k8s_client.V1Job, message: Optional[str]) -> Dict[str, str]:
     # annotations is broken in the k8s library, it's None when it is empty
     annotations = job.metadata.annotations or {}
     metadata_from_annotation = {
@@ -381,7 +399,7 @@ def job_from_k8s(job: k8s_client.V1Job) -> Dict[str, str]:
     computed_metadata = {
         # NOTE: this is passed as string as compatibility with base manager
         "status": status.value,
-        "message": "",
+        "message": message if message else "",
         "progress": {
             # we've no idea about the actual progress
             JobStatus.accepted: "5",

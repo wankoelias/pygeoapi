@@ -237,6 +237,7 @@ class PapermillNotebookKubernetesProcessor(KubernetesProcessor):
         return (
             k8s_client.V1PodSpec(
                 restart_policy="Never",
+                # NOTE: first container is used for status check
                 containers=[notebook_container] + extra_config.containers,
                 volumes=extra_config.volumes,
                 # we need this to be able to terminate the sidecar container
