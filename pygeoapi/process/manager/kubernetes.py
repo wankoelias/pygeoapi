@@ -48,8 +48,6 @@ from pygeoapi.process.manager.base import BaseManager, DATETIME_FORMAT
 LOGGER = logging.getLogger(__name__)
 
 
-RESOURCE_QUOTA_NAME = "eoxhub"
-
 S3_BUCKET_SECRET_NAME = "s3-bucket"
 
 
