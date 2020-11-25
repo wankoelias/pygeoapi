@@ -2,7 +2,7 @@ import click
 import re
 import yaml
 import requests
-
+import os
 
 @click.command()
 @click.argument('notebook', type=click.Path(exists=True))
@@ -37,6 +37,9 @@ def main(notebook, output_filename, parameters_path, wps_endpoint, cpu, mem):
             id=key,
             value=value
         )
+
+    notebook = os.path.abspath(notebook)
+    parameters_path = os.path.abspath(parameters_path)
 
     cpu_request, cpu_limit = parse_cpu(cpu)
     mem_request, mem_limit = parse_mem(mem)
