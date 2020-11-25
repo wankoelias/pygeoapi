@@ -6,12 +6,12 @@ import requests
 
 @click.command()
 @click.argument('notebook', type=click.Path(exists=True))
-@click.argument('output_path', type=click.Path(exists=False))
-@click.argument('parameters_path', type=click.Path(exists=True),)
+@click.argument('output_filename', type=click.STRING)
+@click.argument('parameters_path', type=click.Path(exists=True))
 @click.argument('wps_endpoint', type=click.STRING)
 @click.option('--cpu', default=None, help='number of CPUs format: request/limit')
 @click.option('--mem', default=None, help='memory in GB format: request/limit')
-def main(notebook, output_path, parameters_path, wps_endpoint, cpu, mem):
+def main(notebook, output_filename, parameters_path, wps_endpoint, cpu, mem):
     def parse_limit_reqest(param):
 
         re_float = "(\d+(?:\.\d*)?)"
@@ -46,7 +46,7 @@ def main(notebook, output_path, parameters_path, wps_endpoint, cpu, mem):
 
     parameters["_execution"] = dict(
         notebook=notebook,
-        output_path=output_path,
+        output_filename=output_filename,
         parameters_path=parameters_path,
         cpu_request=cpu_request,
         cpu_limit=cpu_limit,
@@ -62,7 +62,7 @@ def main(notebook, output_path, parameters_path, wps_endpoint, cpu, mem):
 
     inputs = [
         parameter("notebook", notebook),
-        parameter("output_path", output_path),
+        parameter("output_filename", output_filename),
         parameter("parameters_json", parameters),
 
     ]
